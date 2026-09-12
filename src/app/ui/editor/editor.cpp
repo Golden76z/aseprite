@@ -71,6 +71,10 @@
 #include "ui/ui.h"
 #include "view/layers.h"
 
+#if LAF_ANDROID && !defined(NDEBUG)
+  #include <android/log.h>
+#endif
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -2109,6 +2113,26 @@ bool Editor::hasSelectionToolMask()
 //////////////////////////////////////////////////////////////////////
 // Message handler for the editor
 
+#if LAF_ANDROID && !defined(NDEBUG)
+// Bounded discovery trace at the actual editor boundary, after state processing.
+static void log_android_editor_pointer(Editor* editor, MouseMessage* msg)
+{
+  if (!editor->sprite())
+    return;
+  const auto ui = msg->position();
+  const auto canvas = editor->screenToEditor(ui);
+  const auto origin = editor->editorToScreen(gfx::Point(0, 0));
+  const auto corner = editor->editorToScreen(gfx::Point(editor->sprite()->width(),
+                                                       editor->sprite()->height()));
+  __android_log_print(ANDROID_LOG_INFO, "Aseprite",
+                      "EditorPointer %s type=%d ui=%d,%d canvas=%d,%d "
+                      "canvasUiBounds=%d,%d..%d,%d captureAfter=%d",
+                      msg->type() == kMouseDownMessage ? "down" : "up",
+                      int(msg->pointerType()), ui.x, ui.y, canvas.x, canvas.y,
+                      origin.x, origin.y, corner.x, corner.y, int(editor->hasCapture()));
+}
+#endif
+
 bool Editor::onProcessMessage(Message* msg)
 {
   // Delete states
@@ -2192,6 +2216,9 @@ bool Editor::onProcessMessage(Message* msg)
 
         EditorStatePtr holdState(m_state);
         bool state = m_state->onMouseDown(this, mouseMsg);
+#if LAF_ANDROID && !defined(NDEBUG)
+        log_android_editor_pointer(this, mouseMsg);
+#endif
 
         // Re-update the tool modifiers if the state has changed
         // (e.g. we are on DrawingState now). This is required for the
@@ -2221,6 +2248,9 @@ bool Editor::onProcessMessage(Message* msg)
         EditorStatePtr holdState(m_state);
         MouseMessage* mouseMsg = static_cast<MouseMessage*>(msg);
         bool result = m_state->onMouseUp(this, mouseMsg);
+#if LAF_ANDROID && !defined(NDEBUG)
+        log_android_editor_pointer(this, mouseMsg);
+#endif
 
         updateToolByTipProximity(mouseMsg->pointerType());
         updateAutoCelGuides(msg);
