@@ -1,8 +1,17 @@
-# Android ARM64 build milestone
+# Android ARM64 build milestones
 
-This implements only the build infrastructure portion of
-[ANDROID_ARM64_AUDIT.md](../ANDROID_ARM64_AUDIT.md). It does not implement an
-Android window, event loop, input, filesystem, or presentation backend.
+This contains the build infrastructure and minimal LAF platform skeleton from
+[ANDROID_ARM64_AUDIT.md](../ANDROID_ARM64_AUDIT.md). Android now has an internal
+event queue, a CommonSystem base and one logical Skia window. There is no native
+window presentation, Android input translation or filesystem integration.
+
+Detailed reports (French):
+[jalon 1](../ANDROID_ARM64_JALON_1_COMPTE_RENDU.md),
+[jalon 2](../ANDROID_ARM64_JALON_2_COMPTE_RENDU.md).
+
+The port is on the `android-port` branch of
+[Golden76z/aseprite](https://github.com/Golden76z/aseprite/tree/android-port).
+Clone with `--recurse-submodules` to obtain the matching LAF and clip forks.
 
 The `aseprite` CMake target is a shared library whose output is
 `libaseprite.so`. Its NativeActivity entry is a build-only stub: if linked and
@@ -96,7 +105,7 @@ android/gradlew -p android ':app:buildCMakeDebug[arm64-v8a]' \
 
 The native-build task configures the Linux host tools, builds `gen`, imports it
 through `GEN_EXE`, configures Android CMake, then attempts to compile `aseprite`.
-It does not build an APK. The current expected outcome is the backend compile
+It does not build an APK. The current expected outcome is the user-agent compile
 failure documented below.
 
 Useful separate tasks:
@@ -143,105 +152,64 @@ dialog sources and X11 OS sources are excluded only for Android. The common
 Skia system/window sources remain in the build, exposing the missing backend
 rather than substituting a fake window implementation.
 
-## Verified build status — 12 September 2026
+## Verified build status — milestone 2, 12 September 2026
 
-Validated against Aseprite `375989a61`, LAF `ec6f2a5`, and clip `964847c`, with
-the working-tree changes in this milestone.
+- Gradle configures Android CMake successfully and builds the Linux host `gen`.
+- `EventQueueImpl`, `SkiaWindowPlatform` and `SkiaSystemBase` resolve on Android.
+- All four Android backend sources compile to ELF AArch64 objects, with
+  `LAF_ANDROID`, no `LAF_LINUX`, API 26 and `SK_SUPPORT_GPU=0`.
+- The native `laf-os` target succeeds and produces `lib/liblaf-os.a` in the
+  native build directory.
+- The host event-queue contract test passes. It checks polling, timed and infinite
+  waits, worker wake-ups, reentrant callback destruction and concurrent producers.
+- The full `aseprite` target exits with code 1 on the diagnostics below.
+  `libaseprite.so` linking has not been reached; no APK/runtime validation is claimed.
 
-Successful checks:
+The logical window stores geometry and requested state only. Its native handle
+and screen are null. The common Skia raster surface has no presentation path.
+Android advertises only window scale and color-space capabilities, and rejects
+construction of a second live logical window.
 
-- Gradle wrapper and Android plugin configuration.
-- Native Linux `gen` compilation and execution against `data/pref.xml`.
-- Android CMake configuration and generation for ARM64/API 26.
-- CMake code model identifies `aseprite` as `SHARED_LIBRARY`, artifact
-  `lib/libaseprite.so` relative to the native build directory.
-- Android `generate_files` target: 67 generation steps completed using host
-  `gen`, including preferences, widgets, strings, theme, and command IDs.
-- Android `laf-base` target builds, along with dependency archives including
-  clip, FreeType, archive, GIF, zlib, cmark, JSON and XML libraries.
-- The NativeActivity entry stub compiles to an AArch64 object.
-- Android manifest processing succeeds.
-
-The full native build **fails during compilation**, before linking. No
-`libaseprite.so` or APK has been produced. The last full native build log is
-`android/build/android-build.log` in the validated workspace.
-
-### Encountered errors fixed in this milestone
-
-1. Host cfg could not find `SimpleIni.h`: supplied its existing include path to
-   the isolated host-tools project.
-2. Android configuration required XCB, then X11: selected the existing clip
-   stub and separated Android from desktop platform source/library selection.
-3. Existing ARM64 Skia/JPEG archives were not found outside the NDK sysroot:
-   made explicit Android dependency paths bypass sysroot re-rooting. Also
-   corrected Skia's `PATH` arguments to CMake's `PATHS` keyword.
-4. Android inherited desktop GL/fontconfig settings: selected the raster-only
-   Android Skia configuration matching the dependency build.
-5. `laf/base/memory.cpp` called `aligned_alloc`, unavailable at API 26: added an
-   Android-only `posix_memalign` implementation, keeping desktop code intact.
-6. Raster-only compilation of `SkiaSurface::getBitmap()` lacked the
-   `SkSurface_Raster` definition: moved its required include outside the GPU
-   conditional. Desktop builds already included this header with GPU enabled.
-7. WebP was enabled but its archive was not found because of sysroot re-rooting:
-   corrected the Android archive search rather than disabling the feature.
-
-### First remaining errors actually observed
-
-Parallel compilation reports these missing platform types; their order can
-vary between runs:
+### Remaining compiler diagnostics
 
 ```text
-laf/os/common/event_queue.cpp:22
-  error: unknown type name 'EventQueueImpl'
-
-laf/os/skia/skia_window.h:37
-  error: expected class name
-  class SkiaWindow : public SkiaWindowPlatform
-
-laf/os/skia/skia_system.h:41
-  error: unknown class name 'SkiaSystemBase'
+src/updater/user_agent.cpp:57:10: error: no member named 'distroName' in 'base::Platform'
+src/updater/user_agent.cpp:58:13: error: no member named 'distroName' in 'base::Platform'
+src/updater/user_agent.cpp:59:12: error: no member named 'distroVer' in 'base::Platform'
+src/updater/user_agent.cpp:60:22: error: no member named 'distroVer' in 'base::Platform'
 ```
 
-These are the unimplemented Android event-queue, window, and system backend
-selection points. Compilation stops here for this milestone. No fixes for
-unreached downstream blockers are included, and no full desktop build or
-Android runtime test is claimed.
+`src/updater/CMakeLists.txt` always includes this source in `updater-lib`, even
+with `ENABLE_UPDATER=OFF`. Its final platform branch accesses Linux-only fields.
+This remains outside the backend skeleton milestone.
 
-## Changed files
+### Build just the Android LAF target
 
-Created:
+After Gradle configuration, the native build directory in this session is
+`android/app/.cxx/Debug/3x1d695f/arm64-v8a`. Its hash may differ elsewhere.
 
-```text
-android/.gitignore
-android/README.md
-android/settings.gradle.kts
-android/build.gradle.kts
-android/app/build.gradle.kts
-android/app/src/main/AndroidManifest.xml
-android/gradlew
-android/gradlew.bat
-android/gradle/wrapper/gradle-wrapper.jar
-android/gradle/wrapper/gradle-wrapper.properties
-android/host-tools/CMakeLists.txt
-src/main/android_main.cpp
+```bash
+/home/golden/Android/Sdk/cmake/3.22.1/bin/cmake \
+  --build android/app/.cxx/Debug/3x1d695f/arm64-v8a \
+  --target laf-os --parallel 4
 ```
 
-Modified:
+### Run the queue contract test on the host
 
-```text
-CMakeLists.txt
-cmake/FindJpegTurbo.cmake
-src/CMakeLists.txt
-laf/base/CMakeLists.txt
-laf/base/platform.h
-laf/base/memory.cpp
-laf/cmake/FindSkia.cmake
-laf/clip/CMakeLists.txt
-laf/dlgs/CMakeLists.txt
-laf/os/CMakeLists.txt
-laf/os/skia/skia_surface.cpp
+This standalone project executes the portable Android queue implementation on
+Linux; it does not enable tests in the cross-compiled application.
+
+```bash
+aseprite_sdk="${ANDROID_HOME:-$HOME/Android/Sdk}"
+"$aseprite_sdk/cmake/3.22.1/bin/cmake" \
+  -S laf/os/android/tests -B android/build/laf-android-tests -G Ninja \
+  -DCMAKE_MAKE_PROGRAM="$aseprite_sdk/cmake/3.22.1/bin/ninja" \
+  -DCMAKE_BUILD_TYPE=Release
+"$aseprite_sdk/cmake/3.22.1/bin/cmake" \
+  --build android/build/laf-android-tests --parallel 4
+"$aseprite_sdk/cmake/3.22.1/bin/ctest" \
+  --test-dir android/build/laf-android-tests --output-on-failure
 ```
 
-The LAF changes are inside a Git submodule; the clip change is inside its nested
-submodule. No commits or submodule pointer updates were made. The existing
-`ANDROID_ARM64_AUDIT.md` was left unchanged.
+See the milestone reports for exact file lists, implementation limits, build
+iterations and commit references. Skia, build outputs and logs remain untracked.
