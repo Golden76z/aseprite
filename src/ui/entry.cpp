@@ -364,6 +364,10 @@ bool Entry::onProcessMessage(Message* msg)
       break;
 
     case kMouseDownMessage:
+#if LAF_ANDROID
+      if (hasFocus() && !isReadOnly())
+        os::System::instance()->setTextInput(true, caretPosOnScreen());
+#endif
       captureMouse();
 
       // Disable selecting words if we click again (only

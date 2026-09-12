@@ -1794,6 +1794,15 @@ void Manager::onResize(ResizeEvent& ev)
         bounds.y = new_pos.y2() - bounds.h;
       }
     }
+#if LAF_ANDROID
+    // The IME reduces the available raster area without creating another
+    // native window. Keep existing dialogs (especially the file selector)
+    // inside it, and let their normal layouts shrink the flexible content.
+    bounds.w = std::min(bounds.w, new_pos.w);
+    bounds.h = std::min(bounds.h, new_pos.h);
+    bounds.x = std::clamp(bounds.x, new_pos.x, new_pos.x2() - bounds.w);
+    bounds.y = std::clamp(bounds.y, new_pos.y, new_pos.y2() - bounds.h);
+#endif
     window->setBounds(bounds);
   }
 }

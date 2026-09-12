@@ -58,18 +58,33 @@ public final class ImeBridge extends View {
                 activity.addContentView(view, new ViewGroup.LayoutParams(1, 1));
                 current = new WeakReference<>(view);
             }
+            if (view.editing && editing && view.generation == generation) {
+                if (view.hasWindowFocus()) view.imm.showSoftInput(view, 0);
+                return;
+            }
             view.generation = generation;
             view.editing = editing;
             if (view.connection != null) view.connection.valid = false;
             trace(editing ? "text input activated; show request" : "text input deactivated; hide request");
             if (editing) {
+                view.setFocusableInTouchMode(true);
+                view.setFocusable(true);
                 view.requestFocus();
                 view.imm.restartInput(view);
                 final ImeBridge target = view;
                 view.post(() -> { if (target.editing) target.imm.showSoftInput(target, 0); });
             } else {
-                view.imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-                view.clearFocus();
+                final ImeBridge target = view;
+                view.post(() -> {
+                    if (target.editing) return; // Another Entry acquired focus.
+                    target.imm.hideSoftInputFromWindow(target.getWindowToken(), 0);
+                    target.setFocusable(false);
+                    target.clearFocus();
+                    target.imm.restartInput(target);
+                    ViewGroup content = activity.findViewById(android.R.id.content);
+                    if (content != null && content.getChildCount() > 0)
+                        content.getChildAt(0).requestFocus();
+                });
 
             }
         });
