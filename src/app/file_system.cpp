@@ -236,6 +236,10 @@ FileSystemModule::~FileSystemModule()
 #endif
 
   delete fileitems_map;
+  fileitems_map = nullptr;
+  // NativeActivity can run another App instance in the same process. The
+  // root belonged to the map just destroyed and must be recreated with it.
+  rootitem = nullptr;
 
   m_instance = nullptr;
 }

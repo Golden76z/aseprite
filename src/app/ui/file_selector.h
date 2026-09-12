@@ -29,6 +29,8 @@ class IFileItem;
 
 class FileSelector : public app::gen::FileSelector {
 public:
+  // Drop IFileItem pointers when a new App/FileSystem lifetime starts.
+  static void resetNavigationHistory();
   FileSelector(FileSelectorType type);
   ~FileSelector();
 

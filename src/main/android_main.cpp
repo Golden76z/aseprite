@@ -1,6 +1,7 @@
 // NativeActivity owns lifecycle; Aseprite owns its UI thread and initialization.
 #include "app/app_menus.h"
 #include "app/android/saf_bridge.h"
+#include "app/ui/file_selector.h"
 #include "base/fs.h"
 #include "base/platform.h"
 #include "os/android/input.h"
@@ -128,6 +129,7 @@ struct AndroidApp {
         // Android may recreate this activity in the same process after Exit.
         // MainWindow::onResize skips layout while the previous run is kClosing.
         ui::set_app_state(ui::AppState::kNormal);
+        app::FileSelector::resetNavigationHistory();
         const int result = app_main(2, argv);
         __android_log_print(ANDROID_LOG_INFO, kLogTag, "Aseprite app_main returned: %d", result);
       }

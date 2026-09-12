@@ -151,6 +151,12 @@ std::string merge_paths(const base::paths& paths)
 
 } // anonymous namespace
 
+void FileSelector::resetNavigationHistory()
+{
+  navigation_position.reset();
+  navigation_history.clear();
+}
+
 class FileSelector::CustomFileNameEntry : public ComboBox {
 public:
   CustomFileNameEntry() : m_fileList(nullptr)
