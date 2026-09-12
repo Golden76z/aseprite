@@ -122,6 +122,12 @@ void DrawingState::initToolLoop(Editor* editor,
   editor->captureMouse();
 }
 
+void DrawingState::cancelForTouchNavigation(Editor* editor)
+{
+  m_toolLoopManager->cancel();
+  destroyLoopIfCanceled(editor);
+}
+
 void DrawingState::disableMouseStabilizer()
 {
   ASSERT(m_toolLoopManager);

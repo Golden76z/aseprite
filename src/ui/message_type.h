@@ -41,6 +41,7 @@ enum MessageType {
 
   // Touch related messages.
   kTouchMagnifyMessage,
+  kTouchNavigationMessage,
 
   // Drag'n'drop messages.
   kDragEnterMessage, // Mouse pointer entered a drop-target widget's bounds while the user is

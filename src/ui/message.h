@@ -17,6 +17,7 @@
 #include "gfx/point.h"
 #include "gfx/rect.h"
 #include "os/dnd.h"
+#include "os/touch_navigation.h"
 #include "ui/base.h"
 #include "ui/keys.h"
 #include "ui/message_type.h"
@@ -264,6 +265,13 @@ public:
 private:
   gfx::Point m_pos; // Mouse position
   double m_magnification;
+};
+
+class TouchNavigationMessage : public Message {
+public:
+  explicit TouchNavigationMessage(const os::TouchNavigation& value)
+    : Message(kTouchNavigationMessage, kKeyNoneModifier), navigation(value) {}
+  os::TouchNavigation navigation;
 };
 
 class TimerMessage : public Message {

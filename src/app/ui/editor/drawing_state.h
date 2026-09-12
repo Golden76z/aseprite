@@ -61,6 +61,9 @@ public:
   // when Shift+brush tool is used to paint a line
   void disableMouseStabilizer();
 
+  // Roll back the provisional single-contact stroke when navigation takes over.
+  void cancelForTouchNavigation(Editor* editor);
+
   // Used to send a movement() to the ToolLoopManager when
   // Shift+brush tool is used to paint a line.
   void sendMovementToToolLoop(const tools::Pointer& pointer);

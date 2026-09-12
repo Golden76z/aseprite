@@ -232,6 +232,7 @@ private:
 
   // Last pressed mouse button.
   MouseButton m_mouseButton;
+  Widget* m_touchNavigationTarget = nullptr; // Cleared by freeWidget()/dialog opening.
 
   // Widget over which the drag is being hovered in a drag & drop operation.
   Widget* m_dragOverWidget = nullptr;

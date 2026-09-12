@@ -2153,6 +2153,9 @@ static void log_android_editor_pressure(Editor* editor, MouseMessage* msg)
 
 bool Editor::onProcessMessage(Message* msg)
 {
+  if (msg->type() == kMouseEnterMessage || msg->type() == kMouseMoveMessage ||
+      msg->type() == kMouseDownMessage)
+    m_suppressTouchBrushPreview = false;
   // Delete states
   if (!m_deletedStates.empty())
     m_deletedStates.clear();
@@ -2313,6 +2316,51 @@ bool Editor::onProcessMessage(Message* msg)
           return true;
       }
       break;
+
+    case kTouchNavigationMessage: {
+      const auto& nav = static_cast<TouchNavigationMessage*>(msg)->navigation;
+      if (!m_sprite)
+        return false;
+      if (nav.phase == os::TouchNavigation::Begin) {
+        // setEditorScroll()/state changes can request the drawing preview at
+        // the last single-finger position. Hide it until fresh pointer input.
+        m_suppressTouchBrushPreview = true;
+        m_brushPreview.hide();
+        EditorStatePtr holdState(m_state);
+        if (auto* drawing = dynamic_cast<DrawingState*>(m_state.get()))
+          drawing->cancelForTouchNavigation(this);
+        else if (typeid(*m_state) != typeid(StandbyState))
+          return false; // Do not steal an in-progress transform/drag operation.
+        App::instance()->activeToolManager()->releaseButtons();
+        m_secondaryButton = false;
+        m_brushPreview.hide();
+        if (manager()->pick(nav.position) != this)
+          return false; // Cancel provisional drawing even when midpoint is outside.
+      }
+      else if (nav.phase == os::TouchNavigation::Update) {
+        // Same continuous accumulator and predefined zoom levels as
+        // TouchMagnify. Clamp its accumulator to the existing Zoom endpoints.
+        const double scale = std::clamp(zoom().internalScale() * nav.scale,
+          render::Zoom::fromLinearScale(0).scale(),
+          render::Zoom::fromLinearScale(render::Zoom::linearValues()-1).scale());
+        const auto next = render::Zoom::fromScale(scale);
+        if (next != zoom())
+          setZoomAndCenterInMouse(next, nav.previous, ZoomBehavior::MOUSE);
+        else
+          setZoom(next); // Keep fractional magnification between discrete levels.
+        if (nav.position != nav.previous)
+          setEditorScroll(View::getView(this)->viewScroll() - (nav.position - nav.previous));
+      }
+#if defined(LAF_ANDROID) && !defined(NDEBUG)
+      if (nav.phase != os::TouchNavigation::Update) {
+        const auto scroll = View::getView(this)->viewScroll();
+        __android_log_print(ANDROID_LOG_INFO, "Aseprite",
+          "Canvas gesture phase=%d zoom=%.4f internal=%.4f scroll=%d,%d",
+          int(nav.phase), zoom().scale(), zoom().internalScale(), scroll.x, scroll.y);
+      }
+#endif
+      return true;
+    }
 
     case kTouchMagnifyMessage:
       if (m_sprite) {
@@ -3185,7 +3233,8 @@ void Editor::showMouseCursor(CursorType cursorType, const Cursor* cursor)
 
 void Editor::showBrushPreview(const gfx::Point& screenPos)
 {
-  m_brushPreview.show(screenPos);
+  if (!m_suppressTouchBrushPreview)
+    m_brushPreview.show(screenPos);
 }
 
 gfx::Point Editor::calcExtraPadding(const Projection& proj)

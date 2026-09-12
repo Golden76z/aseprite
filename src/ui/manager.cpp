@@ -599,6 +599,48 @@ void Manager::generateMessagesFromOSEvents()
         break;
       }
 
+      case os::Event::TouchNavigation: {
+        const auto navigation = osEvent.navigation();
+        lastMouseMoveEvent = os::Event(); // No drawing cursor update during navigation.
+        if (navigation.phase == os::TouchNavigation::Begin)
+          m_mouseButton = kButtonNone;
+        // Resolve capture/hit-testing after preceding MouseDown messages have
+        // actually run. Never invoke widgets on the Android callback thread.
+        auto* callback = new CallbackMessage([this, display, navigation] {
+          TouchNavigationMessage msg(navigation);
+          msg.setDisplay(display);
+          if (navigation.phase == os::TouchNavigation::Begin) {
+            m_touchNavigationTarget = nullptr;
+            Widget* target = capture_widget ? capture_widget : mouse_widget;
+            // Only the widget under the first contact can opt in. A midpoint
+            // over a menu/dialog must not navigate an editor behind it.
+            if (target && target->sendMessage(&msg))
+              m_touchNavigationTarget = target;
+            else if (capture_widget) {
+              // Cancel the original press without activating a button. This is
+              // the existing capture-loss convention, outside the widget.
+              const gfx::Point outside(-1, -1);
+              freeMouse();
+              for (auto type : {kMouseMoveMessage, kMouseUpMessage}) {
+                if (!capture_widget)
+                  break;
+                std::unique_ptr<MouseMessage> release(newMouseMessage(type, display,
+                  capture_widget, outside, PointerType::Touch, kButtonNone, kKeyNoneModifier));
+                capture_widget->sendMessage(release.get());
+              }
+            }
+          }
+          else if (m_touchNavigationTarget) {
+            m_touchNavigationTarget->sendMessage(&msg);
+            if (navigation.phase != os::TouchNavigation::Update)
+              m_touchNavigationTarget = nullptr;
+          }
+        });
+        callback->setRecipient(this);
+        enqueueMessage(callback);
+        break;
+      }
+
       case os::Event::TouchMagnify: {
         handleTouchMagnify(display,
                            osEvent.position(),
@@ -1171,6 +1213,9 @@ void Manager::freeWidget(Widget* widget)
   if (m_lockedWindow == widget)
     return;
 
+  if (m_touchNavigationTarget == widget)
+    m_touchNavigationTarget = nullptr;
+
   // Break any relationship with the GUI manager
   if (widget->hasCapture() || (widget == capture_widget))
     freeCapture();
@@ -1403,6 +1448,7 @@ void Manager::_openWindow(Window* window, bool center)
 
   // Free all widgets of special states.
   if (window->isWantFocus()) {
+    m_touchNavigationTarget = nullptr;
     freeCapture();
     freeMouse();
     freeFocus();
@@ -1562,6 +1608,9 @@ void Manager::_closeWindow(Window* window, bool redraw_background)
       }
     }
   }
+
+  if (m_touchNavigationTarget && m_touchNavigationTarget->window() == window)
+    m_touchNavigationTarget = nullptr;
 
   // Free all widgets of special states.
   if (capture_widget && capture_widget->window() == window)
@@ -1983,7 +2032,7 @@ bool Manager::sendMessageToWidget(Message* msg, Widget* widget)
       "kKeyDownMessage",      "kKeyUpMessage",     "kFocusEnterMessage",   "kFocusLeaveMessage",
       "kMouseDownMessage",    "kMouseUpMessage",   "kDoubleClickMessage",  "kMouseEnterMessage",
       "kMouseLeaveMessage",   "kMouseMoveMessage", "kSetCursorMessage",    "kMouseWheelMessage",
-      "kTouchMagnifyMessage", "kDragEnterMessage", "kDragLeaveMessage",    "kDragMessage",
+      "kTouchMagnifyMessage", "kTouchNavigationMessage", "kDragEnterMessage", "kDragLeaveMessage",    "kDragMessage",
       "kDropMessage",         "kCallbackMessage",
     };
     static_assert(

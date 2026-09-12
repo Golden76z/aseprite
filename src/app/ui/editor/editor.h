@@ -441,6 +441,7 @@ private:
 
   // Brush preview
   BrushPreview m_brushPreview;
+  bool m_suppressTouchBrushPreview = false;
 
   tools::ToolLoopModifiers m_toolLoopModifiers;
 
