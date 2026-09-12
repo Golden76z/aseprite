@@ -78,6 +78,14 @@ void extractResources(ANativeActivity* activity)
   // Existing user-folder override; assets remain separate from writable settings.
   const std::string user = std::string(activity->internalDataPath) + "/user";
   base::make_all_directories(user);
+  // Ordinary document paths, separate from extracted assets and preferences.
+  const std::string documents = std::string(activity->internalDataPath) + "/documents";
+  base::make_all_directories(documents);
+  if (setenv("LAF_ANDROID_DOCUMENTS_DIR", documents.c_str(), 1) != 0)
+    throw std::runtime_error("Cannot configure Android documents directory");
+#ifndef NDEBUG
+  __android_log_print(ANDROID_LOG_INFO, kLogTag, "Documents directory: %s", documents.c_str());
+#endif
   // stderr otherwise goes to /dev/null in NativeActivity. Keep native assertions
   // even when Android removes the process before debuggerd writes a tombstone.
   if (!std::freopen((user + "/native-stderr.log").c_str(), "w", stderr))

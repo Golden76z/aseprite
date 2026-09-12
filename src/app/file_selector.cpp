@@ -148,6 +148,11 @@ std::string get_initial_path_to_select_filename(const std::string& initialFilena
 std::string get_current_dir_for_file_selector()
 {
   std::string path = Preferences::instance().fileSelector.currentFolder();
+#if LAF_ANDROID
+  // Migrate the bootstrap's Unix-root fallback; keep valid chosen folders.
+  if (path == "/" || !base::is_directory(path))
+    path = "<empty>";
+#endif
   // "<empty>" is the default value for this property, to start from
   // the user docs folder by default.
   if (path == "<empty>") {
