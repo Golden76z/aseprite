@@ -4,11 +4,11 @@
 [jalon 8](ANDROID_ARM64_JALON_8_COMPTE_RENDU.md), ainsi que les rapports précédents.
 Base Aseprite `bd54eade9`, LAF `1b478d6`.
 
-**Raccordement compilé et installé ; validation physique des dynamiques en attente.**
-Le document et les réglages de taille sont prêts sur la XP-Pen MDP1221.
-Aucun résultat physique du jalon 9 n’est encore revendiqué dans cette version
-du rapport. Les pressions mesurées au jalon 8 ne constituent pas une validation
-du nouveau transport jusqu’aux brosses.
+**La taille sensible à la pression fonctionne avec le vrai stylet.** Les traces
+et la capture après dessin établissent le transport jusqu’aux dynamiques et la
+variation visible de largeur. L’utilisateur a terminé cette série (« c’est bon »).
+La validation alpha/opacité reste en attente ; ses réglages sont prêts sur la
+XP-Pen MDP1221.
 
 ## Contrat et chemin inspectés avant modification
 
@@ -129,14 +129,76 @@ a été fermé pour dégager le document. Aucun trait de validation injecté.
 Les taps adb de préparation sont explicitement des injections (`device=-1`).
 Leurs traces Touch montrent raw=1 et Event=0. Elles ne valident pas le stylet réel.
 
-## Validation restant à réaliser
+## Première validation physique — taille
 
-- Traits physiques léger/normal/ferme et progressifs : **en attente**.
-- Égalité représentative Android → Event → message → Pointer : **en attente sur appareil**.
-- Consommation effective par les dynamiques et variation visible de taille : **en attente**.
-- Gradient alpha avec couleur de fond transparente : **à configurer puis tester**.
-- Capture, relâchements, tactile et stabilité après dessin : **à revérifier**.
+Session du 12 septembre, 23:38:34 à 23:39:29, processus 8851. Aucun trait injecté.
+Les neuf contacts Pen sont ceux du vrai périphérique stylus, suivis d’un contact
+tactile réel. Le retour utilisateur ne précise pas séparément chacun des gestes
+demandés : les trois premiers contacts ne sont donc pas arbitrairement étiquetés
+« léger / normal / ferme », plusieurs contacts étant des interactions UI.
 
-Le blocage actuel est la validation manuelle au vrai stylet, pas une erreur de
-compilation. La suite immédiate est de terminer ces tests ; aucune extension
-pression/tilt/historique ne se justifie avant leur résultat.
+| Observation | Résultat |
+|---|---|
+| Pen physique | 9 DOWN / UP, 527 MOVE, 1 569 points historiques, maximum 6 par événement |
+| Domaine contact observé | 0,003052..0,692669, historique compris |
+| Taille visible | Deux longs traits de largeur variable et des marques près du bord ; amincissements jusqu’à un tracé très fin |
+| Doigt | Un trait large et constant, Event/message/Pointer=0 ; 30 MOVE, 69 points historiques |
+| Capture éditeur | Les 5 DOWN Pen et le DOWN Touch observés passent à capture=1 ; chacun des 6 UP revient à capture=0 |
+| UP Pen non nul | Par exemple 0,003052 reste 0,003052 dans Event ; capture libérée ensuite |
+| Annulation physique | Aucun CANCEL observé dans cette série ; pas de validation nouvelle de ce cas |
+| Gomme physique | Aucun TOOL_TYPE_ERASER observé |
+| Qualité | Pas de trou manifeste sur les longs traits capturés ; pas de défaut ou capture bloquée signalé par l’utilisateur |
+
+Valeurs représentatives du **même chemin physique**, aux coordonnées UI indiquées :
+
+| UI | Android | Event | Message | Pointer | Dynamique après seuils existants |
+|---|---|---|---|---|---|
+| 430,174 | 0,072880 | 0,072880 | 0,072880 | 0,072880 | 0,000000 |
+| 430,179 | 0,258439 | 0,258439 | 0,258439 | 0,258439 | Non échantillonnée à cette valeur exacte |
+| 422,224 | 0,505158 | 0,505158 | 0,505158 | 0,505158 | 0,506447 |
+| 343,440 | 0,039980 | 0,039980 | 0,039980 | 0,039980 | 0,000000 |
+
+Autre échantillon outil : Pointer=0,310016 → dynamique=0,262521, conforme aux
+seuils 0,1/0,9. Aucun arrondi binaire, inversion ou calibration Android observé.
+
+**Correction de diagnostic réellement rencontrée :** `Stroke::Pt::size` est un
+float mais la trace initiale utilisait `%d`. Les champs imprimés `size`,
+`gradientSensor`, `gradient` de cette première série sont invalides et ne servent
+pas de preuve numérique. Les valeurs pression/Pointer/dynamique précédentes dans
+la trace correspondent aux types attendus et concordent avec les autres étapes.
+Conversion explicite `int(pt.size)` ajoutée uniquement à l’argument du log,
+sans modifier le calcul ni le dessin.
+
+Build correctif : même commande Gradle avec sortie
+`android/build/jalon9-assemble-4.log`, **BUILD SUCCESSFUL in 4s**, 38 tâches,
+7 exécutées / 31 à jour. Réinstallation `Success`, lancement `Status: ok`,
+`COLD`, `TotalTime: 1069`, `WaitTime: 1075` ms, nouveau processus 9254.
+
+Preuves conservées :
+
+- `android/build/jalon9-pressure-strokes.png` : capture inspectée, taille variable réelle.
+- `android/build/jalon9-size-pressure-path.txt` : extrait borné des traces de cette série.
+- `android/build/jalon9-size-activity.txt` : état de l’activité après dessin.
+- `android/build/jalon9-size-sessions.tar` : archive des sessions de récupération,
+  sans prétendre à un enregistrement du document complet.
+
+## Deuxième série préparée — alpha/opacité
+
+Nouveau document transparent RGBA 512×512. Crayon rond de **taille fixe 32**,
+Size et Angle désactivés, **Gradient / Pressure**, sens **BG > FG**, **No Dithering**,
+seuils 0,1/0,9 conservés. Premier plan bleu de palette (RGB 91,110,225), fond
+RGB 0,0,0 **alpha 0**. Réglages effectués dans l’interface normale : échange des
+couleurs avec X, curseur alpha du sélecteur à zéro, puis nouvel échange.
+
+Les boutons de couleur tout en bas restent dans une zone interceptée par les
+surcouches système ; le sélecteur alpha situé au-dessus et le raccourci X ont
+permis le réglage sans changer insets ni échelle.
+
+- `android/build/jalon9-opacity-settings.png` : réglages inspectés visuellement.
+- `android/build/jalon9-before-opacity.png` : document vide avant cette série.
+- Marqueur logcat : `JALON9_OPACITY_PHYSICAL_READY`.
+
+**Résultat physique de l’opacité en attente.** Il faut vérifier visuellement la
+transparence, distincte de la largeur, et les champs du diagnostic corrigé.
+Aucune erreur de compilation/runtime ne bloque cette étape ; le prochain travail
+est cette validation manuelle, sans extension tilt/boutons/historique.

@@ -211,7 +211,8 @@ controls still overlay parts of the bottom/left edges. Density changes resize
 the existing layout as a whole; no per-widget adaptation is used. Automated device injections confirm touch hit
 positions, cancellation, pen/eraser identification, mouse buttons and basic keys;
 physical finger/pen drawing was validated in milestone 8. Pressure-sensitive
-dynamics are awaiting the milestone 9 physical drawing tests. Reproducible input
+dynamics now produce visibly variable brush size with the physical pen in
+milestone 9; the separate alpha-gradient test remains pending. Reproducible input
 probes are documented in [tests/README.md](tests/README.md).
 
 Presentation retains the native-window lifetime mutex through lock/copy/post.

@@ -478,7 +478,7 @@ void ToolLoopManager::adjustPointWithDynamics(const Pointer& pointer, Stroke::Pt
                         "sizeSensor=%d size=%d gradientSensor=%d gradient=%.6f",
                         int(pointer.type()), pointer.pressure(), p,
                         m_dynamics.minPressureThreshold, m_dynamics.maxPressureThreshold,
-                        int(m_dynamics.size), pt.size, int(m_dynamics.gradient), pt.gradient);
+                        int(m_dynamics.size), int(pt.size), int(m_dynamics.gradient), pt.gradient);
   }
 #endif
 }
