@@ -15,7 +15,8 @@ Detailed reports (French):
 [jalon 4](../ANDROID_ARM64_JALON_4_COMPTE_RENDU.md),
 [jalon 5](../ANDROID_ARM64_JALON_5_COMPTE_RENDU.md),
 [jalon 6](../ANDROID_ARM64_JALON_6_COMPTE_RENDU.md),
-[jalon 7](../ANDROID_ARM64_JALON_7_COMPTE_RENDU.md).
+[jalon 7](../ANDROID_ARM64_JALON_7_COMPTE_RENDU.md),
+[density adjustment](../ANDROID_ARM64_JALON_7_AJUSTEMENT_DENSITE.md).
 Device validation: [XPPen MDP1221](../ANDROID_ARM64_JALON_4_VALIDATION_TABLETTE.md).
 
 The port is on the `android-port` branch of
@@ -186,21 +187,25 @@ real Home UI, menus opened through Android input, and the New Sprite dialog.
 
 Android defaults to window scale 2 through the existing `screen_scale` preference,
 with a one-time migration from the scale-1 bootstrap. Later user choices are
-preserved. The logical Skia surface is 1080x720; integer nearest-neighbor expansion
-fills the physical 2160x1440 RGBA8888 buffer, respecting both row strides and channel
-order. Theme/UI scale remains 1. GPU and MultipleWindows stay off.
+preserved. Android density now also adjusts the window coordinate space, using
+`AConfiguration_getDensity()`. At the tablet's configured 366 dpi, the logical
+Skia surface is 944x629; nearest-neighbor expansion fills the physical 2160x1440
+RGBA8888 buffer (about 14.4% larger than milestone 7's initial UI), respecting
+both row strides and channel order. At 320 dpi the original scale-2 mapping is
+retained. A fit limit preserves at least 480/640 logical pixels on the short/long
+axes. Theme/UI scale remains 1. GPU and MultipleWindows stay off.
 
 NativeActivity attaches AInputQueue to Android's main looper. Its callbacks enqueue
 LAF pointer/key events and wake the existing GUI queue; they never call widgets.
-Physical input coordinates are divided by the current window scale before UI
-hit testing. One pointer ID is tracked; secondary contacts are ignored. Cancel,
+Physical input coordinates are mapped into the density-adjusted window space,
+then divided by the current integer window scale before UI hit testing. One pointer ID is tracked; secondary contacts are ignored. Cancel,
 focus loss and input-queue destruction release pressed state. The LAF stylus type
 is named `Pen`; pressure, tilt, barrel buttons and pen hover are not implemented.
 Keyboard text uses Android's hardware KeyCharacterMap, without IME composition.
 
 The fullscreen window flag uncovers the menu bar. Android navigation and XP-Pen
-controls still overlay parts of the bottom/left edges. There is no density-based
-layout or per-widget adaptation. Automated device injections confirm touch hit
+controls still overlay parts of the bottom/left edges. Density changes resize
+the existing layout as a whole; no per-widget adaptation is used. Automated device injections confirm touch hit
 positions, cancellation, pen/eraser identification, mouse buttons and basic keys;
 physical finger/pen ergonomics still require user validation. Reproducible input
 probes are documented in [tests/README.md](tests/README.md).
@@ -284,7 +289,8 @@ After Gradle configuration, the native build directory in this session is
 ### Run the queue and raster contract tests on the host
 
 This standalone project exercises queue waits/wakeups and integer raster copying
-with RGBA/BGRA, scales 1/2/4 and independent row padding on Linux. It does not enable
+with RGBA/BGRA, scales 1/2/4, fractional density ratios and independent row padding
+on Linux. A density test also checks that raster sampling matches pointer targets. It does not enable
 tests in the cross-compiled application.
 
 ```bash

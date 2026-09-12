@@ -13,6 +13,7 @@
 #include "ui/message.h"
 
 #include <android/asset_manager.h>
+#include <android/configuration.h>
 #include <android/log.h>
 #include <android/native_activity.h>
 #include <android/native_window.h>
@@ -144,15 +145,7 @@ struct AndroidApp {
     os::Event event;
     event.setType(os::Event::Callback);
     event.setCallback([done, ticket] {
-      gfx::Rect bounds;
-      {
-        auto native = os::SystemAndroid::lockNativeWindow();
-        if (native.window)
-          bounds = gfx::Rect(0,
-                             0,
-                             ANativeWindow_getWidth(native.window),
-                             ANativeWindow_getHeight(native.window));
-      }
+      const auto bounds = os::SystemAndroid::displayBounds();
       if (auto* window = os::WindowAndroid::instance()) {
         if (!bounds.isEmpty()) {
           window->setFrame(bounds);
@@ -258,6 +251,21 @@ void onInputQueueDestroyed(ANativeActivity* activity, AInputQueue*)
 {
   static_cast<AndroidApp*>(activity->instance)->input.detach();
 }
+void updateDisplayDensity(ANativeActivity* activity)
+{
+  auto* configuration = AConfiguration_new();
+  AConfiguration_fromAssetManager(configuration, activity->assetManager);
+  const int density = AConfiguration_getDensity(configuration);
+  AConfiguration_delete(configuration);
+  os::SystemAndroid::setDisplayDensity(density);
+  __android_log_print(ANDROID_LOG_INFO, kLogTag, "Android display density=%d dpi", density);
+}
+void onConfigurationChanged(ANativeActivity* activity)
+{
+  updateDisplayDensity(activity);
+  static_cast<AndroidApp*>(activity->instance)->redraw(false);
+}
+
 void onWindowFocusChanged(ANativeActivity* activity, int focused)
 {
   if (!focused)
@@ -292,7 +300,9 @@ extern "C" JNIEXPORT void ANativeActivity_onCreate(ANativeActivity* activity, vo
   // The status bar previously covered the menu targets. Leave navigation and
   // vendor overlays to Android; no immersive-mode/lifecycle machinery here.
   ANativeActivity_setWindowFlags(activity, AWINDOW_FLAG_FULLSCREEN, 0);
+  updateDisplayDensity(activity);
   activity->instance = new AndroidApp(activity->env);
+  activity->callbacks->onConfigurationChanged = onConfigurationChanged;
   activity->callbacks->onInputQueueCreated = onInputQueueCreated;
   activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
   activity->callbacks->onWindowFocusChanged = onWindowFocusChanged;

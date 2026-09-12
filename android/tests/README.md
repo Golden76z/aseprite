@@ -22,6 +22,9 @@ javac --release 8 -cp "$aseprite_sdk/platforms/android-34/android.jar" \
 
 Start Aseprite and verify it is the foreground app before each probe. Coordinates
 below are physical pixels on the tested 2160x1440 tablet at window scale 2.
+The later density adjustment changes dialog positions: inspect the current
+screenshot before using the original milestone-7 Cancel coordinates below.
+File/Edit remain accessible at the menu coordinates shown here.
 
 ```bash
 aseprite_adb="$aseprite_sdk/platform-tools/adb"
