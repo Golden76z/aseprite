@@ -167,7 +167,10 @@ void Entry::setCaretPos(const int pos)
     startTimer();
   m_state = true;
 
-  os::System::instance()->setTextInput(true, caretPosOnScreen());
+#if LAF_ANDROID
+  if (hasFocus() && !isReadOnly())
+#endif
+    os::System::instance()->setTextInput(true, caretPosOnScreen());
 
   invalidate();
 }
@@ -297,7 +300,11 @@ bool Entry::onProcessMessage(Message* msg)
       }
 
       // Start processing dead keys
+#if LAF_ANDROID
+      if (!isReadOnly()) {
+#else
       if (m_translate_dead_keys) {
+#endif
         os::System::instance()->setTextInput(true, caretPosOnScreen());
       }
       break;
@@ -313,7 +320,9 @@ bool Entry::onProcessMessage(Message* msg)
       m_recent_focused = false;
 
       // Stop processing dead keys
+#if !LAF_ANDROID
       if (m_translate_dead_keys)
+#endif
         os::System::instance()->setTextInput(false);
       break;
 

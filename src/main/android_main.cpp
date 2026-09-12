@@ -4,6 +4,7 @@
 #include "base/fs.h"
 #include "base/platform.h"
 #include "os/android/input.h"
+#include "os/android/text_input.h"
 #include "os/android/system.h"
 #include "os/android/window.h"
 #include "os/event.h"
@@ -291,6 +292,7 @@ void onStart(ANativeActivity*)
 }
 void onDestroy(ANativeActivity* activity)
 {
+  os::AndroidTextInput::detach(activity);
   app::android::detachSaf(activity);
   os::SystemAndroid::setNativeWindow(nullptr);
   delete static_cast<AndroidApp*>(activity->instance);
@@ -313,6 +315,7 @@ extern "C" JNIEXPORT void ANativeActivity_onCreate(ANativeActivity* activity, vo
   updateDisplayDensity(activity);
   activity->instance = new AndroidApp(activity->env);
   app::android::attachSaf(activity);
+  os::AndroidTextInput::attach(activity);
   activity->callbacks->onConfigurationChanged = onConfigurationChanged;
   activity->callbacks->onInputQueueCreated = onInputQueueCreated;
   activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
