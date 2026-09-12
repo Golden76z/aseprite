@@ -13,7 +13,6 @@ import android.provider.OpenableColumns;
 import android.util.Log;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -131,7 +130,7 @@ public final class SafBridge extends Fragment {
                     }
                     if (!partial.renameTo(target)) throw new IOException("Cannot commit working copy");
                     trace("import bytes=" + bytes + " private=" + target.getAbsolutePath());
-                    finish(0, target.getAbsolutePath(), "Opened private copy: " + name);
+                    finish(0, target.getAbsolutePath(), "Imported private copy: " + name);
                 } else {
                     try (FileInputStream in = new FileInputStream(localPath);
                          ParcelFileDescriptor fd = resolver.openFileDescriptor(uri, "wt", cancellation)) {

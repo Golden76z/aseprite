@@ -6,6 +6,11 @@
 // the End-User License Agreement for Aseprite.
 
 FOR_EACH_COMMAND(About)
+#if LAF_ANDROID
+FOR_EACH_COMMAND(AndroidOpenExternal)
+FOR_EACH_COMMAND(AndroidExportAseprite)
+FOR_EACH_COMMAND(AndroidExportPng)
+#endif
 FOR_EACH_COMMAND(AddColor)
 FOR_EACH_COMMAND(AdvancedMode)
 FOR_EACH_COMMAND(Apply)

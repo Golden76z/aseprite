@@ -351,6 +351,15 @@ void AppMenus::reload()
   LOG("MENU: Loading menus from %s\n", path);
 
   m_rootMenu.reset(loadMenuById(handle, "main_menu"));
+#if LAF_ANDROID
+  if (auto* file = dynamic_cast<ui::MenuItem*>(m_rootMenu->findItemById("file_menu"))) {
+    auto* menu = file->getSubmenu();
+    menu->addChild(new ui::Separator("", ui::HORIZONTAL));
+    menu->addChild(new AppMenuItem("Open External...", CommandId::AndroidOpenExternal()));
+    menu->addChild(new AppMenuItem("Export External ASEPRITE...", CommandId::AndroidExportAseprite()));
+    menu->addChild(new AppMenuItem("Export External PNG (current frame)...", CommandId::AndroidExportPng()));
+  }
+#endif
 
   LOG("MENU: Main menu loaded.\n");
 
