@@ -8,16 +8,17 @@ window presentation, Android input translation or filesystem integration.
 Detailed reports (French):
 [jalon 1](../ANDROID_ARM64_JALON_1_COMPTE_RENDU.md),
 [jalon 2](../ANDROID_ARM64_JALON_2_COMPTE_RENDU.md),
-[jalon 3](../ANDROID_ARM64_JALON_3_COMPTE_RENDU.md).
+[jalon 3](../ANDROID_ARM64_JALON_3_COMPTE_RENDU.md),
+[jalon 4](../ANDROID_ARM64_JALON_4_COMPTE_RENDU.md).
 
 The port is on the `android-port` branch of
 [Golden76z/aseprite](https://github.com/Golden76z/aseprite/tree/android-port).
 Clone with `--recurse-submodules` to obtain the matching LAF and clip forks.
 
 The `aseprite` CMake target is a shared library whose output is
-`libaseprite.so`. Its NativeActivity entry is a build-only stub: if linked and
-launched, it logs that the backend is unavailable and finishes the activity.
-It does not invoke the desktop application loop.
+`libaseprite.so`. Its NativeActivity entry logs library loading, creation, start
+and destruction, then returns to Android's main looper without finishing the
+activity. It does not invoke the desktop application loop or draw anything.
 
 ## Toolchain
 
@@ -91,6 +92,16 @@ WebP remains enabled and resolves to the ARM64 archive in this directory.
 From the repository root, with the prerequisites above:
 
 ```bash
+android/gradlew -p android :app:assembleDebug --console=plain --max-workers=4
+```
+
+This produces the signed debug APK at
+`android/app/build/outputs/apk/debug/app-debug.apk`, containing
+`lib/arm64-v8a/libaseprite.so` and `lib/arm64-v8a/libc++_shared.so`.
+
+To build only the native library:
+
+```bash
 android/gradlew -p android ':app:buildCMakeDebug[arm64-v8a]' \
   --console=plain --max-workers=4
 ```
@@ -153,7 +164,7 @@ instead of XCB; no system clipboard integration was added. Native desktop
 dialog sources and X11 OS sources are excluded only for Android. The common
 Skia system/window sources use the Android skeleton introduced in milestone 2.
 
-## Verified build status — milestone 3, 12 September 2026
+## Verified build status — milestone 4, 12 September 2026
 
 - Gradle configures Android CMake successfully and builds the Linux host `gen`.
 - `EventQueueImpl`, `SkiaWindowPlatform` and `SkiaSystemBase` resolve on Android.
@@ -165,12 +176,18 @@ Skia system/window sources use the Android skeleton introduced in milestone 2.
   these platform-selection changes.
 - `getFullOSString()` now returns `Android` on Android, without Linux distribution
   fields or an invented OS version.
-- The full `aseprite` target succeeds: exit code 0, `BUILD SUCCESSFUL in 1m 49s`.
+- The full `aseprite` target compiles and links successfully.
 - Linking produces the ELF64 AArch64 shared library at
   `android/app/.cxx/Debug/3x1d695f/arm64-v8a/lib/libaseprite.so`.
   Its exported symbols include `ANativeActivity_onCreate` and `app_main(int, char**)`.
-- No compiler or linker errors remain in this build. Existing compiler warnings
-  remain. No APK construction, device execution or functional editor is claimed.
+- `:app:assembleDebug` succeeds: exit code 0, `BUILD SUCCESSFUL in 17s`.
+- The APK signature verifies (v2), ZIP native-library alignment verifies at
+  16 KiB, and the packaged Aseprite library is ELF64 AArch64 with its native
+  entry point exported.
+- The packaged manifest declares the exported `android.app.NativeActivity`,
+  library name `aseprite`, entry `ANativeActivity_onCreate` and `hasCode=false`.
+- adb found no connected device. Installation, launch, logcat and continued
+  activity lifetime have not been validated on Android.
 
 The logical window stores geometry and requested state only. Its native handle
 and screen are null. The common Skia raster surface has no presentation path.
@@ -182,6 +199,44 @@ The first rebuild after the user-agent fix exposed missing SkSL declarations in
 the SkSL support already present in the archive. No editor source or rendering
 implementation was changed. See the milestone 3 report for the exact diagnostics
 and the two build iterations.
+
+### Install and check native startup manually
+
+No Android device was available during milestone 4. Run these commands from the
+repository root after connecting an authorized ARM64 device (Android API 26+).
+If multiple devices are listed, add `-s SERIAL` to the adb commands.
+
+```bash
+aseprite_adb=/home/golden/Android/Sdk/platform-tools/adb
+"$aseprite_adb" devices -l
+"$aseprite_adb" install -r android/app/build/outputs/apk/debug/app-debug.apk
+"$aseprite_adb" shell am force-stop org.aseprite.android
+"$aseprite_adb" shell am start -W -n org.aseprite.android/android.app.NativeActivity
+sleep 5
+"$aseprite_adb" shell pidof org.aseprite.android
+"$aseprite_adb" shell dumpsys activity activities > android/build/jalon4-activity.txt
+"$aseprite_adb" logcat -d -v threadtime -s Aseprite:I AndroidRuntime:E libc:F \
+  > android/build/jalon4-logcat.txt
+cat android/build/jalon4-logcat.txt
+```
+
+Check the current launch's timestamps in logcat and that the resumed activity
+in `jalon4-activity.txt` belongs to `org.aseprite.android`. A surviving process
+alone does not establish that its activity stayed open.
+
+Expected messages from the source code, **not device observations**:
+
+```text
+Native library loaded: libaseprite.so
+ANativeActivity_onCreate entered
+Platform=Android ABI=arm64-v8a backend=skia GPU=0 SDK=<device API>
+Android activity created; editor not started
+Android activity started
+```
+
+Normal activity destruction logs `Android activity destroyed`. Force-stopping
+or killing the process does not guarantee an `onDestroy` callback. There is no
+editor UI or rendered test frame in this milestone.
 
 ### Build just the Android LAF target
 
