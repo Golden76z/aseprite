@@ -34,6 +34,10 @@
 
 #define TOOL_TRACE(...) // TRACEARGS(__VA_ARGS__)
 
+#if LAF_ANDROID && !defined(NDEBUG)
+  #include <android/log.h>
+#endif
+
 namespace app { namespace tools {
 
 using namespace gfx;
@@ -465,6 +469,18 @@ void ToolLoopManager::adjustPointWithDynamics(const Pointer& pointer, Stroke::Pt
 
   pt.size = std::clamp(size, int(Brush::kMinBrushSize), int(Brush::kMaxBrushSize));
   pt.angle = std::clamp(angle, -180, 180);
+#if LAF_ANDROID && !defined(NDEBUG)
+  const unsigned bucket = 1u << int(p * 4);
+  if (!(m_pressureTraceMask & bucket)) {
+    m_pressureTraceMask |= bucket;
+    __android_log_print(ANDROID_LOG_INFO, "Aseprite",
+                        "PressureTool type=%d pointer=%.6f dynamics=%.6f thresholds=%.3f,%.3f "
+                        "sizeSensor=%d size=%d gradientSensor=%d gradient=%.6f",
+                        int(pointer.type()), pointer.pressure(), p,
+                        m_dynamics.minPressureThreshold, m_dynamics.maxPressureThreshold,
+                        int(m_dynamics.size), pt.size, int(m_dynamics.gradient), pt.gradient);
+  }
+#endif
 }
 
 }} // namespace app::tools

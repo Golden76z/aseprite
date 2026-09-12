@@ -2131,6 +2131,24 @@ static void log_android_editor_pointer(Editor* editor, MouseMessage* msg)
                       int(msg->pointerType()), ui.x, ui.y, canvas.x, canvas.y,
                       origin.x, origin.y, corner.x, corner.y, int(editor->hasCapture()));
 }
+
+static void log_android_editor_pressure(Editor* editor, MouseMessage* msg)
+{
+  static thread_local unsigned seen = 0;
+  if (msg->type() == kMouseDownMessage)
+    seen = 0;
+  else if (msg->button() == kButtonNone)
+    return;
+  const auto pointer = pointer_from_msg(editor, msg);
+  const unsigned bucket = 1u << int(std::clamp(msg->pressure(), 0.0f, 1.0f) * 4);
+  if (!(seen & bucket)) {
+    seen |= bucket;
+    __android_log_print(ANDROID_LOG_INFO, "Aseprite",
+                        "PressureUI type=%d ui=%d,%d message=%.6f pointer=%.6f",
+                        int(msg->pointerType()), msg->position().x, msg->position().y,
+                        msg->pressure(), pointer.pressure());
+  }
+}
 #endif
 
 bool Editor::onProcessMessage(Message* msg)
@@ -2197,6 +2215,9 @@ bool Editor::onProcessMessage(Message* msg)
           invalidateCanvas();
         }
 
+#if LAF_ANDROID && !defined(NDEBUG)
+        log_android_editor_pressure(this, mouseMsg);
+#endif
         m_oldPos = mouseMsg->position();
         updateToolByTipProximity(mouseMsg->pointerType());
         updateAutoCelGuides(msg);
@@ -2236,6 +2257,9 @@ bool Editor::onProcessMessage(Message* msg)
         EditorStatePtr holdState(m_state);
         MouseMessage* mouseMsg = static_cast<MouseMessage*>(msg);
 
+#if LAF_ANDROID && !defined(NDEBUG)
+        log_android_editor_pressure(this, mouseMsg);
+#endif
         updateToolByTipProximity(mouseMsg->pointerType());
         updateAutoCelGuides(msg);
 

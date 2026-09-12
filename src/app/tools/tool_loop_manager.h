@@ -101,6 +101,9 @@ private:
   gfx::Region m_dirtyArea;
   gfx::Region m_nextDirtyArea;
   DynamicsOptions m_dynamics;
+#if LAF_ANDROID && !defined(NDEBUG)
+  unsigned m_pressureTraceMask = 0;
+#endif
   gfx::PointF m_stabilizerCenter;
   doc::Brush* m_brush0 = nullptr;
 };

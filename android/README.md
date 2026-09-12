@@ -200,14 +200,18 @@ LAF pointer/key events and wake the existing GUI queue; they never call widgets.
 Physical input coordinates are mapped into the density-adjusted window space,
 then divided by the current integer window scale before UI hit testing. One pointer ID is tracked; secondary contacts are ignored. Cancel,
 focus loss and input-queue destruction release pressed state. The LAF stylus type
-is named `Pen`; pressure, tilt, barrel buttons and pen hover are not implemented.
+is named `Pen`. Android's normalized Pen/Eraser pressure now reaches LAF events
+unchanged within 0..1 (defensive bounds/non-finite checks only); Touch and Mouse
+retain zero event pressure. Contact ends on UP/CANCEL, never on pressure zero.
+Tilt, barrel buttons and pen hover are not implemented.
 Keyboard text uses Android's hardware KeyCharacterMap, without IME composition.
 
 The fullscreen window flag uncovers the menu bar. Android navigation and XP-Pen
 controls still overlay parts of the bottom/left edges. Density changes resize
 the existing layout as a whole; no per-widget adaptation is used. Automated device injections confirm touch hit
 positions, cancellation, pen/eraser identification, mouse buttons and basic keys;
-physical finger/pen ergonomics still require user validation. Reproducible input
+physical finger/pen drawing was validated in milestone 8. Pressure-sensitive
+dynamics are awaiting the milestone 9 physical drawing tests. Reproducible input
 probes are documented in [tests/README.md](tests/README.md).
 
 Presentation retains the native-window lifetime mutex through lock/copy/post.
@@ -286,11 +290,13 @@ After Gradle configuration, the native build directory in this session is
   --target laf-os --parallel 4
 ```
 
-### Run the queue and raster contract tests on the host
+### Run the Android contract tests on the host
 
 This standalone project exercises queue waits/wakeups and integer raster copying
 with RGBA/BGRA, scales 1/2/4, fractional density ratios and independent row padding
-on Linux. A density test also checks that raster sampling matches pointer targets. It does not enable
+on Linux. A density test also checks that raster sampling matches pointer targets.
+A pressure test checks normalized Pen/Eraser values through the event queue,
+nonzero release pressure, invalid values, and unchanged Touch/Mouse defaults. It does not enable
 tests in the cross-compiled application.
 
 ```bash
