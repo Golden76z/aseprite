@@ -43,6 +43,16 @@ Probe modes take two coordinates `x y`:
 - `multi`: ID 7 down; ID 11 down; reordered move; secondary up; active up.
 - `active-up`: same, but active ID 7 is lifted first. Remaining ID 11 must not
   become a new active contact; its later move/up must not produce another click.
+- `gesture-in` / `gesture-out`: two fingers spread/pinch around physical `x y`,
+  using 40 current samples and reordered IDs. The first contact is held 80 ms
+  before the second; its provisional stroke must be rolled back. After the
+  original finger lifts, the remaining finger moves 300 px without drawing.
+- `gesture-pan`: translate the midpoint by (+240,+130) physical pixels at
+  constant separation. Actual editor scroll changes, zoom stays constant.
+- `gesture-cancel`: same pan ending in Android ACTION_CANCEL.
+- `pen-fingers`: Pen plus one Finger slot, ten Pen moves then both releases.
+  Finger motion must not navigate or interrupt the Pen. Uses a touchscreen
+  source with explicit tool types; this is not a physical pressure test.
 - `cancel`: down immediately followed by cancel, without a forced sleep.
 - `eraser`: an eraser-type down/up. The LAF name must be `Eraser`.
 - `left` / `mouse`: explicit primary / secondary mouse down/up.
@@ -61,9 +71,9 @@ subsequent ordinary tap on Cancel must close it:
 ```
 
 These coordinates apply to the centered dialog on the validated tablet. Inspect
-its current position before repeating the test. The probe's contact pressure
-field is only a property of the injected Android event; the backend does not
-read or forward pressure in this milestone.
+its current position before repeating the test. The probe uses constant injected pressure 1.0. Since milestone 9 the backend
+forwards normalized Pen/Eraser pressure; Touch remains at the existing default.
+These probes cannot validate physical pressure dynamics.
 
 Observe `Aseprite` logcat messages and capture screenshots to validate actual UI
 responses. Injection acceptance alone does not prove widget hit testing. Source
@@ -71,3 +81,10 @@ responses. Injection acceptance alone does not prove widget hit testing. Source
 
 Portable raster/queue tests use the standalone CMake project at
 `laf/os/android/tests`. See `android/README.md` for its build and CTest commands.
+
+Milestone 13: open a copy of a saved document before navigation probes, compare
+screenshots and editor zoom/scroll logs, then save and compare the document bytes
+with the original. A provisional mark must not persist after a gesture. Keep
+physical validation separate: real fingers must verify direction/feel and the
+real pen must still draw with pressure. Android may cancel artificial three-tool
+streams; do not suppress framework ACTION_CANCEL to make a probe pass.
