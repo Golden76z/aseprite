@@ -49,6 +49,11 @@ std::string getFullOSString()
 
   os << "macOS " << p.osVer.major() << "." << p.osVer.minor() << "." << p.osVer.patch();
 
+#elif LAF_ANDROID
+
+  // The Android platform layer identifies the OS but does not expose its version yet.
+  os << "Android";
+
 #else
 
   // ----------------------------------------------------------------------

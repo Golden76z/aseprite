@@ -7,7 +7,8 @@ window presentation, Android input translation or filesystem integration.
 
 Detailed reports (French):
 [jalon 1](../ANDROID_ARM64_JALON_1_COMPTE_RENDU.md),
-[jalon 2](../ANDROID_ARM64_JALON_2_COMPTE_RENDU.md).
+[jalon 2](../ANDROID_ARM64_JALON_2_COMPTE_RENDU.md),
+[jalon 3](../ANDROID_ARM64_JALON_3_COMPTE_RENDU.md).
 
 The port is on the `android-port` branch of
 [Golden76z/aseprite](https://github.com/Golden76z/aseprite/tree/android-port).
@@ -104,9 +105,8 @@ android/gradlew -p android ':app:buildCMakeDebug[arm64-v8a]' \
 ```
 
 The native-build task configures the Linux host tools, builds `gen`, imports it
-through `GEN_EXE`, configures Android CMake, then attempts to compile `aseprite`.
-It does not build an APK. The current expected outcome is the user-agent compile
-failure documented below.
+through `GEN_EXE`, configures Android CMake, then compiles and links `aseprite`.
+The verified output is `libaseprite.so`. This task does not build an APK.
 
 Useful separate tasks:
 
@@ -146,13 +146,14 @@ ENABLE_TRIAL_MODE=OFF
 ```
 
 Android defines `LAF_ANDROID`, not `LAF_LINUX`, and uses `SK_BUILD_FOR_ANDROID`
-with `SK_SUPPORT_GPU=0`. The existing process-local `clip_none.cpp` is selected
+with `SK_SUPPORT_GPU=0` and `SK_ENABLE_SKSL=1`. The latter matches the runtime
+effects already present in the raster Skia archive; it does not enable GPU
+rendering. The existing process-local `clip_none.cpp` is selected
 instead of XCB; no system clipboard integration was added. Native desktop
 dialog sources and X11 OS sources are excluded only for Android. The common
-Skia system/window sources remain in the build, exposing the missing backend
-rather than substituting a fake window implementation.
+Skia system/window sources use the Android skeleton introduced in milestone 2.
 
-## Verified build status — milestone 2, 12 September 2026
+## Verified build status — milestone 3, 12 September 2026
 
 - Gradle configures Android CMake successfully and builds the Linux host `gen`.
 - `EventQueueImpl`, `SkiaWindowPlatform` and `SkiaSystemBase` resolve on Android.
@@ -160,28 +161,27 @@ rather than substituting a fake window implementation.
   `LAF_ANDROID`, no `LAF_LINUX`, API 26 and `SK_SUPPORT_GPU=0`.
 - The native `laf-os` target succeeds and produces `lib/liblaf-os.a` in the
   native build directory.
-- The host event-queue contract test passes. It checks polling, timed and infinite
-  waits, worker wake-ups, reentrant callback destruction and concurrent producers.
-- The full `aseprite` target exits with code 1 on the diagnostics below.
-  `libaseprite.so` linking has not been reached; no APK/runtime validation is claimed.
+- The host event-queue contract test passed in milestone 2; it was not rerun for
+  these platform-selection changes.
+- `getFullOSString()` now returns `Android` on Android, without Linux distribution
+  fields or an invented OS version.
+- The full `aseprite` target succeeds: exit code 0, `BUILD SUCCESSFUL in 1m 49s`.
+- Linking produces the ELF64 AArch64 shared library at
+  `android/app/.cxx/Debug/3x1d695f/arm64-v8a/lib/libaseprite.so`.
+  Its exported symbols include `ANativeActivity_onCreate` and `app_main(int, char**)`.
+- No compiler or linker errors remain in this build. Existing compiler warnings
+  remain. No APK construction, device execution or functional editor is claimed.
 
 The logical window stores geometry and requested state only. Its native handle
 and screen are null. The common Skia raster surface has no presentation path.
 Android advertises only window scale and color-space capabilities, and rejects
 construction of a second live logical window.
 
-### Remaining compiler diagnostics
-
-```text
-src/updater/user_agent.cpp:57:10: error: no member named 'distroName' in 'base::Platform'
-src/updater/user_agent.cpp:58:13: error: no member named 'distroName' in 'base::Platform'
-src/updater/user_agent.cpp:59:12: error: no member named 'distroVer' in 'base::Platform'
-src/updater/user_agent.cpp:60:22: error: no member named 'distroVer' in 'base::Platform'
-```
-
-`src/updater/CMakeLists.txt` always includes this source in `updater-lib`, even
-with `ENABLE_UPDATER=OFF`. Its final platform branch accesses Linux-only fields.
-This remains outside the backend skeleton milestone.
+The first rebuild after the user-agent fix exposed missing SkSL declarations in
+`brush_preview.cpp`. The Android branch of `laf/cmake/FindSkia.cmake` now exposes
+the SkSL support already present in the archive. No editor source or rendering
+implementation was changed. See the milestone 3 report for the exact diagnostics
+and the two build iterations.
 
 ### Build just the Android LAF target
 
