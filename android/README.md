@@ -357,6 +357,30 @@ older Android versions have not been validated.
 [Milestone 12](../ANDROID_ARM64_JALON_12_COMPTE_RENDU.md) records Save As, numeric
 entry, accented text, hardware regression and lifecycle tests on Gboard.
 
+### Two-finger canvas navigation
+
+A single finger or Pen/Eraser still uses the existing drawing events. Two Finger
+contacts start a navigation session through LAF's opt-in `TouchNavigation` event
+and the GUI queue. Only an editor at the gesture midpoint accepts it; lists,
+menus, text fields and dialogs do not become zoom targets. The provisional
+single-finger stroke is rolled back using the existing tool-loop cancellation.
+Lifting either finger ends navigation; the remaining contact cannot draw until
+a fresh DOWN. CANCEL clears the session. Finger contacts do not steal an active
+Pen/Eraser stroke. A third finger cancels navigation; there are no three-finger
+commands or custom palm rejection.
+
+Distance ratios are measured before rounding in physical window coordinates.
+The midpoint uses the existing density-aware pointer conversion to logical UI
+coordinates. Zoom uses `render::Zoom::fromScale()`/`internalScale()` and
+`Editor::setZoomAndCenterInMouse()`; pan uses `Editor::setEditorScroll()`. Zoom
+retains Aseprite's predefined levels and limits, accumulating small changes
+between levels. Raster scaling, density and pressure handling are unchanged.
+Motion is event-driven, without historical sample replay or a polling thread.
+
+See [milestone 13](../ANDROID_ARM64_JALON_13_COMPTE_RENDU.md) for device evidence,
+physical validation status and limitations, and [input probes](tests/README.md)
+for reproducible injected transition tests.
+
 ### Build just the Android LAF target
 
 After Gradle configuration, the native build directory in this session is
