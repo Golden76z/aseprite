@@ -1,14 +1,16 @@
-# Jalon 8 — dessin physique : préparation terminée, essais matériels en attente
+# Jalon 8 — dessin tactile physique observé, stylet en attente
 
 12 septembre 2026. Références : les rapports précédents, surtout
 [jalon 7](ANDROID_ARM64_JALON_7_COMPTE_RENDU.md) et
 [ajustement de densité](ANDROID_ARM64_JALON_7_AJUSTEMENT_DENSITE.md).
 Point de départ : Aseprite `24e4fbbab`, LAF `a853c62`.
 
-**Ce document ne valide pas encore le dessin physique.** Le nouvel APK de
-mesure est installé et un vrai document 256×256 RGBA transparent est ouvert.
-La suite exige les gestes de l’utilisateur au doigt puis au stylet.
-Aucun trait de validation n’a été injecté par adb.
+**Le dessin tactile physique est maintenant observé dans le document.**
+L’utilisateur indique : « ça a l’air de bien fonctionner ». Les traces reçues
+proviennent uniquement du tactile `fts_ts` (device 4, TOOL_TYPE_FINGER → Touch),
+et la capture confirme les traits blancs dans le document RGBA 256×256.
+Le stylet et la gomme ne sont pas encore validés : aucun événement Pen/Eraser
+physique n’a été reçu dans cette phase. Aucun trait n’a été injecté par adb.
 
 ## Préparation vérifiée
 
@@ -72,28 +74,63 @@ L’historique Android n’est actuellement pas rejoué. Les diagnostics le comp
 et lisent sa pression sans créer de nouveaux événements. Sa nécessité ne pourra
 être jugée qu’après observation de traits physiques.
 
-## Résultats physiques à ce stade
+## Résultats physiques — première série tactile
+
+Fenêtre observée : du premier DOWN à 23:03:41.638 au dernier UP à 23:09:53.819.
+Le retour utilisateur est positif mais général ; il ne confirme pas séparément
+chaque point du protocole ni une série au stylet.
 
 | Demande | Résultat |
 |---|---|
-| Tests réellement effectués avec le doigt | Aucun reçu depuis la préparation |
-| Doigt : contrôles, traits, relâchements | En attente de l’utilisateur |
-| Stylet physique : UI et dessin | En attente |
-| Gomme physique | Non testée ; comportement matériel inconnu |
-| Tool types physiques reçus | Aucun pendant cette phase de mesure |
-| Pression minimale/maximale réelle | Non mesurée |
-| Pression légère/ferme | Non mesurée ; essais séparés nécessaires |
-| Pression du doigt | Non mesurée |
-| Historique MOVE physique | Présence inconnue, besoin de replay non établi |
-| Alignement haut-gauche/centre/bas-droite | En attente de gestes et d’observation utilisateur |
-| Latence, trous, sauts ou relâchement manqué | Non évalués physiquement |
-| Confort de la taille d’UI | Avis utilisateur en attente ; échelle conservée |
+| Entrée réelle reçue | device 4 `fts_ts`, source `0x1002`, tool=1, LAF Touch=3 |
+| Contacts tactiles | 39 DOWN / 39 UP, fins `end=up` |
+| Déplacements | 856 ACTION_MOVE livrés |
+| Dessin dans l’éditeur | plusieurs traits séparés et continus visibles dans le document ; capture inspectée |
+| Capture | les 37 DOWN traités par l’éditeur finissent avec capture=1 ; les 38 UP traités finissent avec capture=0 |
+| Relâchements extérieurs | observés hors des limites du document, capture libérée |
+| Annulation physique | aucun ACTION_CANCEL dans cette série ; pas de conclusion sur ce cas |
+| Pression du doigt | **1.000000..1.000000**, DOWN/MOVE et historique ; UP également 1 dans les échantillons reçus |
+| Historique tactile | **1 701 points**, jusqu’à **4 par événement** |
+| Rejeu de l’historique | toujours absent ; aucun défaut signalé ne justifie encore de l’ajouter |
+| Stylet physique / gomme | aucun événement tool=2/4, encore à tester |
+| Pression stylet légère/normale/ferme | non mesurée |
+| État Android après dessin | RESUMED, même PID 7801, aucun crash observé |
+| Taille de l’UI | réglage conservé ; pas de problème précis signalé, avis détaillé encore absent |
 
-Le seul contact enregistré après installation au moment de ce compte rendu est
-le tap **injecté** sur OK : `device=-1`, `tool=1`, pression DOWN 1 puis UP 0,
-aucun MOVE/historique. Ces valeurs ne sont pas des mesures du doigt physique.
+Le nombre de messages de l’éditeur n’est pas celui des contacts natifs : les taps
+sur l’interface peuvent être consommés par un autre widget. Ces comptes ne sont
+pas présentés comme 39 traits de dessin. Aucune capture restant active après les
+UP de l’éditeur n’est observée.
+
+La capture montre des lignes continues, plusieurs tracés distincts et des points
+sur le damier. Les discontinuités d’une image finale ne permettent pas de distinguer
+les levées volontaires de la main d’un éventuel point manquant. L’utilisateur ne
+signale pas de défaut ; aucune correction de fréquence ou interpolation n’est faite.
+La latence perçue n’est pas quantifiée par cette capture statique.
+
+### Coordonnées et bordures
+
+Pour cette vue à zoom 100 %, le document occupe les coordonnées UI
+`(372,199)..(628,455)`. Exemple réellement reçu :
+
+```text
+native=962.55,737.49 window=840,643 ui=420,321
+EditorPointer down type=3 ui=420,321 canvas=48,122
+canvasUiBounds=372,199..628,455 captureAfter=1
+```
+
+Des fins de trait sont également reçues au-delà du canevas, notamment
+`canvas=(320,165)` puis `captureAfter=0`. Les coordonnées négatives hors document
+sont attendues dans le chemin de l’éditeur ; aucun décalage correctif n’est ajouté.
+Les traits couvrent plusieurs zones du document et ses bords. La correspondance
+perçue exactement sous le doigt aux trois points prescrits reste à confirmer
+explicitement ; aucune vérification au stylet n’est encore possible.
+
+Le seul contact **injecté** de préparation est exclu de ces statistiques :
+contact 1 sur OK, `device=-1`, DOWN pression 1 puis UP 0, aucun MOVE/historique.
 Le marqueur `Jalon8_SETUP_COMPLETE_NO_MORE_INJECTION` est enregistré à 22:57:06.960.
-Aucune autre injection n’est utilisée pour dessiner.
+La différence de pression au relâchement entre injection et doigt réel confirme
+qu’il faut utiliser ACTION_UP, et non une pression nulle, pour terminer un contact.
 
 ## Capacités déclarées par Android — pas des mesures de contact
 
@@ -118,8 +155,13 @@ Captures produites :
 - `android/build/jalon8-document-settings.png` : dialogue réglé à 256×256 RGBA.
 - `android/build/jalon8-document.png` : vrai document vide, capture inspectée.
 
-Pas encore de `jalon8-finger.png` ni de `jalon8-stylus.png` : il n’y a pas eu
-d’essai physique à capturer. Logcat : `android/build/jalon8-logcat.txt` ;
+- `android/build/jalon8-finger.png` : dessin après la série tactile, inspecté.
+- `android/build/jalon8-finger-logcat.txt` : instantané des événements physiques.
+- `android/build/jalon8-finger-summary.json` : comptes de cette série.
+- `android/build/jalon8-activity-finger.txt` : état RESUMED après dessin.
+
+Pas encore de `jalon8-stylus.png` : aucun essai Pen physique reçu.
+Logcat continu : `android/build/jalon8-logcat.txt` ;
 capacités : `android/build/jalon8-input-devices.txt` ; état Android :
 `android/build/jalon8-activity.txt`. Les artefacts restent locaux, ignorés par Git.
 
@@ -145,13 +187,13 @@ Modifiés :
 
 ## Point bloquant et suite
 
-**Blocage exact : les gestes physiques et leur observation nécessitent
-l’utilisateur devant la tablette.** La préparation, la compilation et
-l’installation ont réussi ; aucun problème de dessin physique ne peut encore
-être affirmé ou corrigé.
+**Étape restante : essais du stylet physique et mesure de sa pression avec
+l’utilisateur devant la tablette.** La série tactile donne un premier résultat
+positif. Aucun changement fonctionnel ni nouvelle compilation n’est nécessaire
+pour poursuivre avec le stylet ; l’APK de diagnostic et le document restent ouverts.
 
-Effectuer d’abord la série au doigt, puis celle au stylet avec trois contacts
-identifiés léger/normal/ferme et la gomme si le matériel en expose une. Mettre à
-jour ce rapport avec les mesures réelles avant de déclarer le jalon validé.
-Le jalon pression devra ensuite s’appuyer sur ces valeurs et sur un comportement
-de capture stable. Aucune dynamique de brosse n’est implémentée ici.
+Effectuer la série au stylet avec trois contacts identifiés léger/normal/ferme,
+les taps UI et les bordures, puis la gomme si le matériel en expose une. Confirmer
+aussi le confort, les coordonnées et les éventuels défauts de continuité. Le jalon
+pression devra s’appuyer sur ces mesures physiques et un comportement de capture
+stable. Aucune dynamique de brosse n’est implémentée ici.
