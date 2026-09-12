@@ -283,6 +283,27 @@ also be read with:
 "$aseprite_adb" shell run-as org.aseprite.android cat files/user/Aseprite.log
 ```
 
+### Save and reopen private documents
+
+NativeActivity creates `documents/` next to `runtime/` and `user/` inside its
+`internalDataPath`. The existing file selector starts there; Save, Save As,
+Open, Recent Files and PNG export use ordinary private paths. Runtime assets,
+preferences and documents remain separate. No storage permission or SAF is used.
+
+Enter a name such as `test-jalon10.aseprite` using a hardware keyboard, then
+confirm the selector. Period and minus keys are supported. There is no soft
+keyboard/IME yet. If Android system controls intercept the bottom buttons,
+move the dialog upwards by its title bar or confirm with Enter.
+
+Inspect debug app files without changing their location:
+
+```bash
+"$aseprite_adb" -d shell run-as org.aseprite.android ls -l files/documents
+```
+
+[Milestone 10](../ANDROID_ARM64_JALON_10_COMPTE_RENDU.md) records the device
+save/reopen, unsaved-dialog, restart, Recent Files and PNG export validation.
+
 ### Build just the Android LAF target
 
 After Gradle configuration, the native build directory in this session is
