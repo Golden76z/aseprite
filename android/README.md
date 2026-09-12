@@ -288,7 +288,8 @@ also be read with:
 NativeActivity creates `documents/` next to `runtime/` and `user/` inside its
 `internalDataPath`. The existing file selector starts there; Save, Save As,
 Open, Recent Files and PNG export use ordinary private paths. Runtime assets,
-preferences and documents remain separate. No storage permission or SAF is used.
+preferences and documents remain separate. This private workflow does not use
+SAF or request storage permissions.
 
 Enter a name such as `test-jalon10.aseprite` using a hardware keyboard, then
 confirm the selector. Period and minus keys are supported. There is no soft
@@ -303,6 +304,35 @@ Inspect debug app files without changing their location:
 
 [Milestone 10](../ANDROID_ARM64_JALON_10_COMPTE_RENDU.md) records the device
 save/reopen, unsaved-dialog, restart, Recent Files and PNG export validation.
+
+### Open and export through Android storage providers
+
+Android adds three commands at the bottom of File:
+
+- **Open External...** opens Android Documents and imports the selected file
+  into a unique private `documents/import-<UUID>/` directory. ASE/ASEPRITE and
+  PNG use the existing Aseprite decoder. Recent Files points to this private copy.
+- **Export External ASEPRITE...** encodes a copy with layers and frames, then
+  asks Android Documents where to write it.
+- **Export External PNG (current frame)...** exports the current frame through
+  the existing PNG encoder, then asks Android Documents where to write it.
+
+**Save continues to save only the private working copy.** To write a new external
+copy, use Export External again. Export does not rename the editable document or
+clear its modified state. Cancelling the picker leaves the document intact.
+
+NativeActivity remains the main Activity. A headless framework Fragment handles
+picker results; provider descriptors are copied on a worker and completion is
+queued back to the LAF GUI thread. `content://` URIs never enter the POSIX file
+pipeline. No broad storage permission is requested. Import retains URI grants
+only when offered, but does not associate documents with an original URI for
+automatic writeback. Pending operations are abandoned on Activity destruction;
+they are not restored across process death. Failed provider writes can leave a
+partial external file; the private editable document remains available.
+
+[Milestone 11](../ANDROID_ARM64_JALON_11_COMPTE_RENDU.md) records device validation
+with Downloads and the tablet's Documents provider, including cancellation,
+restart, layers/transparency and byte-for-byte round trips.
 
 ### Build just the Android LAF target
 
