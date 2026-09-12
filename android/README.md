@@ -2,14 +2,16 @@
 
 This contains the build infrastructure and minimal LAF platform skeleton from
 [ANDROID_ARM64_AUDIT.md](../ANDROID_ARM64_AUDIT.md). Android now has an internal
-event queue, a CommonSystem base and one logical Skia window. There is no native
-window presentation, Android input translation or filesystem integration.
+event queue, a CommonSystem base and one logical Skia window. Its raster surface
+is presented through ANativeWindow. Android input translation, filesystem
+integration and full editor startup are not implemented.
 
 Detailed reports (French):
 [jalon 1](../ANDROID_ARM64_JALON_1_COMPTE_RENDU.md),
 [jalon 2](../ANDROID_ARM64_JALON_2_COMPTE_RENDU.md),
 [jalon 3](../ANDROID_ARM64_JALON_3_COMPTE_RENDU.md),
-[jalon 4](../ANDROID_ARM64_JALON_4_COMPTE_RENDU.md).
+[jalon 4](../ANDROID_ARM64_JALON_4_COMPTE_RENDU.md),
+[jalon 5](../ANDROID_ARM64_JALON_5_COMPTE_RENDU.md).
 Device validation: [XPPen MDP1221](../ANDROID_ARM64_JALON_4_VALIDATION_TABLETTE.md).
 
 The port is on the `android-port` branch of
@@ -19,7 +21,8 @@ Clone with `--recurse-submodules` to obtain the matching LAF and clip forks.
 The `aseprite` CMake target is a shared library whose output is
 `libaseprite.so`. Its NativeActivity entry logs library loading, creation, start
 and destruction, then returns to Android's main looper without finishing the
-activity. It does not invoke the desktop application loop or draw anything.
+activity. It draws a deterministic Skia raster test frame through the actual
+LAF window surface. It does not invoke the desktop application loop.
 
 ## Toolchain
 
@@ -165,7 +168,7 @@ instead of XCB; no system clipboard integration was added. Native desktop
 dialog sources and X11 OS sources are excluded only for Android. The common
 Skia system/window sources use the Android skeleton introduced in milestone 2.
 
-## Verified build status — milestone 4, 12 September 2026
+## Verified build status — milestone 5, 12 September 2026
 
 - Gradle configures Android CMake successfully and builds the Linux host `gen`.
 - `EventQueueImpl`, `SkiaWindowPlatform` and `SkiaSystemBase` resolve on Android.
@@ -181,7 +184,7 @@ Skia system/window sources use the Android skeleton introduced in milestone 2.
 - Linking produces the ELF64 AArch64 shared library at
   `android/app/.cxx/Debug/3x1d695f/arm64-v8a/lib/libaseprite.so`.
   Its exported symbols include `ANativeActivity_onCreate` and `app_main(int, char**)`.
-- `:app:assembleDebug` succeeds: exit code 0, `BUILD SUCCESSFUL in 17s`.
+- `:app:assembleDebug` succeeds: exit code 0, `BUILD SUCCESSFUL in 6s`.
 - The APK signature verifies (v2), ZIP native-library alignment verifies at
   16 KiB, and the packaged Aseprite library is ELF64 AArch64 with its native
   entry point exported.
@@ -191,11 +194,20 @@ Skia system/window sources use the Android skeleton introduced in milestone 2.
   APK installation, native library loading, `ANativeActivity_onCreate`, `onStart`,
   continued foreground activity, `onDestroy`, and a second cold launch.
   The device report above contains the actual logcat messages.
+- Raster presentation is visually verified on the same tablet: native window
+  2160x1440 (initial format 4), Skia surface 2160x1440 with rowBytes 8640,
+  locked Android buffer stride 2160 pixels and format 1 (RGBA8888).
+- `android/build/jalon5-screen.png` shows the dark background, white rectangle,
+  cyan/red blocks and yellow diagonal. Sampled colors match exactly, including
+  after native-window destruction/recreation and a complete activity relaunch.
 
-The logical window stores geometry and requested state only. Its native handle
-and screen are null. The common Skia raster surface has no presentation path.
-Android advertises only window scale and color-space capabilities, and rejects
-construction of a second live logical window.
+The native handle is borrowed from SystemAndroid and becomes null on native
+window destruction. The logical window can survive and use a replacement native
+window. Screen discovery remains absent and only one logical window is supported.
+This milestone presents at scale 1, using actual window dimensions; other scales
+and mismatching buffer dimensions are rejected explicitly. No density adaptation
+is implemented. Skia reads its source rowBytes and receives the Android buffer's
+actual destination stride, with explicit RGBA8888 destination format.
 
 The first rebuild after the user-agent fix exposed missing SkSL declarations in
 `brush_preview.cpp`. The Android branch of `laf/cmake/FindSkia.cmake` now exposes
@@ -239,8 +251,18 @@ Android activity started
 ```
 
 Normal activity destruction logs `Android activity destroyed`. Force-stopping
-or killing the process does not guarantee an `onDestroy` callback. There is no
-editor UI or rendered test frame in this milestone.
+or killing the process does not guarantee an `onDestroy` callback. Milestone 5
+also logs native-window creation/destruction, raster dimensions, the first locked
+buffer and `First raster frame presented` on successful copy/post.
+
+Capture the test frame after the launch animation has finished:
+
+```bash
+sleep 5
+"$aseprite_adb" exec-out screencap -p > android/build/jalon5-screen.png
+```
+
+The image should show the deterministic raster pattern, not an editor UI.
 
 ### Build just the Android LAF target
 
