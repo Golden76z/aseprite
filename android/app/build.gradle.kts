@@ -9,7 +9,29 @@ val skiaDir = providers.gradleProperty("aseprite.skiaDir")
 val skiaLibraryDir = providers.gradleProperty("aseprite.skiaLibraryDir")
     .orElse(skiaDir.map { "$it/out/android-arm64" })
 
+// Ship the same source data used by CMake copy_data, plus its license documents.
+val runtimeAssets = layout.buildDirectory.dir("generated/runtimeAssets")
+val prepareRuntimeAssets by tasks.registering(Sync::class) {
+    into(runtimeAssets)
+    from(repositoryRoot.resolve("data")) { into("runtime/data") }
+    from(repositoryRoot) {
+        include("README.md", "AUTHORS.md", "EULA.txt", "docs/LICENSES.md")
+        into("runtime/data")
+    }
+    from(skiaDir.map { "$it/third_party/externals/icu/flutter/icudtl.dat" }) { into("runtime") }
+    doLast {
+        val root = runtimeAssets.get().asFile
+        val runtime = root.resolve("runtime")
+        root.resolve("runtime-files.txt").writeText(
+            runtime.walkTopDown().filter { it.isFile }
+                .map { it.relativeTo(runtime).invariantSeparatorsPath }
+                .sorted().joinToString("\n", postfix = "\n")
+        )
+    }
+}
+
 android {
+    sourceSets.getByName("main").assets.directories.add(runtimeAssets.get().asFile.absolutePath)
     namespace = "org.aseprite.android"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
@@ -92,6 +114,9 @@ val buildHostGen by tasks.registering(Exec::class) {
 }
 
 tasks.configureEach {
+    if (name.startsWith("merge") && name.endsWith("Assets")) {
+        dependsOn(prepareRuntimeAssets)
+    }
     if (name.startsWith("configureCMake")) {
         dependsOn(buildHostGen)
     }

@@ -3,15 +3,17 @@
 This contains the build infrastructure and minimal LAF platform skeleton from
 [ANDROID_ARM64_AUDIT.md](../ANDROID_ARM64_AUDIT.md). Android now has an internal
 event queue, a CommonSystem base and one logical Skia window. Its raster surface
-is presented through ANativeWindow. Android input translation, filesystem
-integration and full editor startup are not implemented.
+is presented through ANativeWindow. The real Aseprite startup and Home UI now
+run on the tablet. Android input translation and filesystem integration remain
+unimplemented.
 
 Detailed reports (French):
 [jalon 1](../ANDROID_ARM64_JALON_1_COMPTE_RENDU.md),
 [jalon 2](../ANDROID_ARM64_JALON_2_COMPTE_RENDU.md),
 [jalon 3](../ANDROID_ARM64_JALON_3_COMPTE_RENDU.md),
 [jalon 4](../ANDROID_ARM64_JALON_4_COMPTE_RENDU.md),
-[jalon 5](../ANDROID_ARM64_JALON_5_COMPTE_RENDU.md).
+[jalon 5](../ANDROID_ARM64_JALON_5_COMPTE_RENDU.md),
+[jalon 6](../ANDROID_ARM64_JALON_6_COMPTE_RENDU.md).
 Device validation: [XPPen MDP1221](../ANDROID_ARM64_JALON_4_VALIDATION_TABLETTE.md).
 
 The port is on the `android-port` branch of
@@ -21,8 +23,10 @@ Clone with `--recurse-submodules` to obtain the matching LAF and clip forks.
 The `aseprite` CMake target is a shared library whose output is
 `libaseprite.so`. Its NativeActivity entry logs library loading, creation, start
 and destruction, then returns to Android's main looper without finishing the
-activity. It draws a deterministic Skia raster test frame through the actual
-LAF window surface. It does not invoke the desktop application loop.
+activity. Once ANativeWindow is available, an owned UI thread extracts the APK
+resources to app-private storage and calls the existing `app_main()` (no duplicate
+App initialization). Android destruction requests normal app exit and joins that
+thread. The milestone 5 test pattern has been removed.
 
 ## Toolchain
 
@@ -168,52 +172,29 @@ instead of XCB; no system clipboard integration was added. Native desktop
 dialog sources and X11 OS sources are excluded only for Android. The common
 Skia system/window sources use the Android skeleton introduced in milestone 2.
 
-## Verified build status — milestone 5, 12 September 2026
+## Verified build status — milestone 6, 12 September 2026
 
-- Gradle configures Android CMake successfully and builds the Linux host `gen`.
-- `EventQueueImpl`, `SkiaWindowPlatform` and `SkiaSystemBase` resolve on Android.
-- All four Android backend sources compile to ELF AArch64 objects, with
-  `LAF_ANDROID`, no `LAF_LINUX`, API 26 and `SK_SUPPORT_GPU=0`.
-- The native `laf-os` target succeeds and produces `lib/liblaf-os.a` in the
-  native build directory.
-- The host event-queue contract test passed in milestone 2; it was not rerun for
-  these platform-selection changes.
-- `getFullOSString()` now returns `Android` on Android, without Linux distribution
-  fields or an invented OS version.
-- The full `aseprite` target compiles and links successfully.
-- Linking produces the ELF64 AArch64 shared library at
-  `android/app/.cxx/Debug/3x1d695f/arm64-v8a/lib/libaseprite.so`.
-  Its exported symbols include `ANativeActivity_onCreate` and `app_main(int, char**)`.
-- `:app:assembleDebug` succeeds: exit code 0, `BUILD SUCCESSFUL in 6s`.
-- The APK signature verifies (v2), ZIP native-library alignment verifies at
-  16 KiB, and the packaged Aseprite library is ELF64 AArch64 with its native
-  entry point exported.
-- The packaged manifest declares the exported `android.app.NativeActivity`,
-  library name `aseprite`, entry `ANativeActivity_onCreate` and `hasCode=false`.
-- Follow-up validation on an XPPen MDP1221 running Android 14 (API 34) succeeded:
-  APK installation, native library loading, `ANativeActivity_onCreate`, `onStart`,
-  continued foreground activity, `onDestroy`, and a second cold launch.
-  The device report above contains the actual logcat messages.
-- Raster presentation is visually verified on the same tablet: native window
-  2160x1440 (initial format 4), Skia surface 2160x1440 with rowBytes 8640,
-  locked Android buffer stride 2160 pixels and format 1 (RGBA8888).
-- `android/build/jalon5-screen.png` shows the dark background, white rectangle,
-  cyan/red blocks and yellow diagonal. Sampled colors match exactly, including
-  after native-window destruction/recreation and a complete activity relaunch.
+The full native build and debug APK succeed. The APK contains the ARM64 Aseprite
+and C++ runtime libraries, 190 runtime resource files and their extraction index.
+The original build feature flags and single-window policy are preserved.
 
-The native handle is borrowed from SystemAndroid and becomes null on native
-window destruction. The logical window can survive and use a replacement native
-window. Screen discovery remains absent and only one logical window is supported.
-This milestone presents at scale 1, using actual window dimensions; other scales
-and mismatching buffer dimensions are rejected explicitly. No density adaptation
-is implemented. Skia reads its source rowBytes and receives the Android buffer's
-actual destination stride, with explicit RGBA8888 destination format.
+On the XPPen MDP1221 (Android 14/API 34), installation succeeds and `app_main()`
+loads the theme, fonts, widgets, strings and palettes. A screenshot confirms the
+real menus and Home UI, rendered through the existing Skia raster presenter.
+No document is opened; a drawing canvas/toolbox is therefore not validated.
 
-The first rebuild after the user-agent fix exposed missing SkSL declarations in
-`brush_preview.cpp`. The Android branch of `laf/cmake/FindSkia.cmake` now exposes
-the SkSL support already present in the archive. No editor source or rendering
-implementation was changed. See the milestone 3 report for the exact diagnostics
-and the two build iterations.
+The Android screen reports the native 2160x1440 bounds. Window scale is explicitly
+limited to 1; `WindowScale` is no longer advertised. This preserves the presenter's
+one-to-one pixel contract. The UI is small and Android system bars overlap it;
+density and insets adaptation are separate work. GPU and MultipleWindows stay off.
+
+Presentation holds a native-window lifetime mutex through lock/copy/post. Android
+window destruction clears/releases its reference under that same mutex. Callbacks
+queue redraw/resize work on the existing LAF queue; its condition variable wakes
+the UI thread. Synchronous Android redraw waits for completion or application exit.
+At rest the measured CPU tick count did not increase during a 12-second sample.
+Home/return, normal task removal (app_main returns 0, thread joined), and a cold
+relaunch were tested. See the milestone 6 report for logs and screenshots.
 
 ### Install and check native startup manually
 
@@ -230,14 +211,14 @@ aseprite_adb=/home/golden/Android/Sdk/platform-tools/adb
 "$aseprite_adb" shell am start -W -n org.aseprite.android/android.app.NativeActivity
 sleep 5
 "$aseprite_adb" shell pidof org.aseprite.android
-"$aseprite_adb" shell dumpsys activity activities > android/build/jalon4-activity.txt
+"$aseprite_adb" shell dumpsys activity activities > android/build/jalon6-activity.txt
 "$aseprite_adb" logcat -d -v threadtime -s Aseprite:I AndroidRuntime:E libc:F \
-  > android/build/jalon4-logcat.txt
-cat android/build/jalon4-logcat.txt
+  > android/build/jalon6-logcat.txt
+cat android/build/jalon6-logcat.txt
 ```
 
 Check the current launch's timestamps in logcat and that the resumed activity
-in `jalon4-activity.txt` belongs to `org.aseprite.android`. A surviving process
+in `jalon6-activity.txt` belongs to `org.aseprite.android`. A surviving process
 alone does not establish that its activity stayed open.
 
 Startup messages (also observed during the tablet validation; SDK was `34`):
@@ -246,23 +227,31 @@ Startup messages (also observed during the tablet validation; SDK was `34`):
 Native library loaded: libaseprite.so
 ANativeActivity_onCreate entered
 Platform=Android ABI=arm64-v8a backend=skia GPU=0 SDK=<device API>
-Android activity created; editor not started
 Android activity started
+Runtime resources extracted: 190 files
+Entering Aseprite app_main
+First raster frame presented
 ```
 
-Normal activity destruction logs `Android activity destroyed`. Force-stopping
+Normal activity destruction logs `Aseprite app_main returned: 0`, then
+`Android activity destroyed; UI thread joined`. Force-stopping
 or killing the process does not guarantee an `onDestroy` callback. Milestone 5
 also logs native-window creation/destruction, raster dimensions, the first locked
 buffer and `First raster frame presented` on successful copy/post.
 
-Capture the test frame after the launch animation has finished:
+Capture the UI after the launch animation has finished:
 
 ```bash
 sleep 5
-"$aseprite_adb" exec-out screencap -p > android/build/jalon5-screen.png
+"$aseprite_adb" exec-out screencap -p > android/build/jalon6-screen.png
 ```
 
-The image should show the deterministic raster pattern, not an editor UI.
+The image should show the Aseprite menu bar and Home tab. No Android input is
+implemented yet. Runtime logs can also be read with:
+
+```bash
+"$aseprite_adb" shell run-as org.aseprite.android cat files/user/Aseprite.log
+```
 
 ### Build just the Android LAF target
 

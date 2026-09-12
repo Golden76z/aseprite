@@ -83,9 +83,15 @@ void ResourceFinder::includeBinDir(const char* filename)
 
 void ResourceFinder::includeDataDir(const char* filename)
 {
+#if !LAF_ANDROID
   char buf[4096];
+#endif
 
-#ifdef _WIN32
+#if LAF_ANDROID
+  includeUserDir(base::join_path("data", filename).c_str());
+  if (const char* data = std::getenv("ASEPRITE_ANDROID_DATA_DIR"))
+    addPath(base::join_path(data, filename));
+#elif defined(_WIN32)
 
   std::snprintf(buf, sizeof(buf), "data/%s", filename);
   includeHomeDir(buf); // %AppData%/Aseprite/data/filename
