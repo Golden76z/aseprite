@@ -4,6 +4,9 @@
 #include <android/log.h>
 #include <mutex>
 
+extern "C" JNIEXPORT void JNICALL Java_org_aseprite_android_SafBridge_complete(
+  JNIEnv*, jclass, jlong, jint, jbyteArray, jbyteArray);
+
 namespace app::android {
 namespace {
 std::mutex mutex;
@@ -43,6 +46,18 @@ void attachSaf(ANativeActivity* activity)
   auto load = env->GetMethodID(loaderCls, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
   auto name = env->NewStringUTF("org.aseprite.android.SafBridge");
   auto local = static_cast<jclass>(env->CallObjectMethod(loader, load, name));
+  if (!env->ExceptionCheck() && local) {
+    // NativeActivity loads the library through the framework native loader,
+    // not this helper's System.loadLibrary namespace. Bind the callback explicitly.
+    JNINativeMethod methods[] = {{const_cast<char*>("complete"), const_cast<char*>("(JI[B[B)V"),
+      reinterpret_cast<void*>(Java_org_aseprite_android_SafBridge_complete)}};
+    if (env->RegisterNatives(local, methods, 1) != JNI_OK) {
+      env->ExceptionClear();
+      __android_log_write(ANDROID_LOG_ERROR, "Aseprite", "SAF callback registration failed");
+      env->DeleteLocalRef(local);
+      local = nullptr;
+    }
+  }
   if (!env->ExceptionCheck() && local) {
     bridge = static_cast<jclass>(env->NewGlobalRef(local));
     activityRef = env->NewGlobalRef(activity->clazz);
