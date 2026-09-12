@@ -1,18 +1,25 @@
 // NativeActivity owns lifecycle; Aseprite owns its UI thread and initialization.
+#include "app/app_menus.h"
 #include "base/fs.h"
 #include "base/platform.h"
+#include "os/android/input.h"
 #include "os/android/system.h"
 #include "os/android/window.h"
 #include "os/event.h"
 #include "os/event_queue.h"
 #include "os/window.h"
+#include "ui/app_state.h"
+#include "ui/manager.h"
+#include "ui/message.h"
 
 #include <android/asset_manager.h>
 #include <android/log.h>
 #include <android/native_activity.h>
 #include <android/native_window.h>
+#include <android/window.h>
 
 #include <condition_variable>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 #include <memory>
@@ -70,6 +77,10 @@ void extractResources(ANativeActivity* activity)
   // Existing user-folder override; assets remain separate from writable settings.
   const std::string user = std::string(activity->internalDataPath) + "/user";
   base::make_all_directories(user);
+  // stderr otherwise goes to /dev/null in NativeActivity. Keep native assertions
+  // even when Android removes the process before debuggerd writes a tombstone.
+  if (!std::freopen((user + "/native-stderr.log").c_str(), "w", stderr))
+    throw std::runtime_error("Cannot open native diagnostic log");
   setenv("ASEPRITE_USER_FOLDER", user.c_str(), 1);
   setenv("ASEPRITE_ANDROID_DATA_DIR", (root + "/data").c_str(), 1);
   setenv("ICU_DATA", root.c_str(), 1);
@@ -85,6 +96,8 @@ struct Completion {
 };
 
 struct AndroidApp {
+  explicit AndroidApp(JNIEnv* env) : input(env) {}
+  os::InputAndroid input;
   std::thread thread;
   std::shared_ptr<Completion> completion = std::make_shared<Completion>();
 
@@ -101,6 +114,9 @@ struct AndroidApp {
         char verbose[] = "--verbose";
         char* argv[] = { executable, verbose, nullptr };
         __android_log_write(ANDROID_LOG_INFO, kLogTag, "Entering Aseprite app_main");
+        // Android may recreate this activity in the same process after Exit.
+        // MainWindow::onResize skips layout while the previous run is kClosing.
+        ui::set_app_state(ui::AppState::kNormal);
         const int result = app_main(2, argv);
         __android_log_print(ANDROID_LOG_INFO, kLogTag, "Aseprite app_main returned: %d", result);
       }
@@ -112,6 +128,9 @@ struct AndroidApp {
         done->finished = true;
       }
       done->changed.notify_all();
+      // File > Exit also ends NativeActivity. This NDK call posts to its main
+      // looper; onDestroy still owns/join()s this thread.
+      ANativeActivity_finish(activity);
     });
   }
 
@@ -154,11 +173,39 @@ struct AndroidApp {
 
   ~AndroidApp()
   {
+    input.detach();
     if (thread.joinable()) {
       os::Event event;
-      event.setType(os::Event::CloseApp);
-      os::EventQueue::instance()->queueEvent(event);
+      event.setType(os::Event::Callback);
+      event.setCallback([] {
+        // Close nested menu boxes before the native close notification is
+        // broadcast. Otherwise a detached child menu can receive it again.
+        if (auto* menus = app::AppMenus::instance()) {
+          if (auto* root = menus->getRootMenu()) {
+            if (auto* box = dynamic_cast<ui::MenuBox*>(root->parent()))
+              box->cancelMenuLoop();
+          }
+        }
+        // cancelMenuLoop queues UI messages. Send CloseApp only after those messages
+        // have executed, without dispatching widgets on Android's main thread.
+        auto* manager = ui::Manager::getDefault();
+        auto* afterMenus = new ui::CallbackMessage([] {
+          os::Event close;
+          close.setType(os::Event::CloseApp);
+          os::queue_event(close);
+        });
+        afterMenus->setRecipient(manager);
+        manager->enqueueMessage(afterMenus);
+      });
+      {
+        std::lock_guard<std::mutex> lock(completion->mutex);
+        if (!completion->finished)
+          os::queue_event(event);
+      }
       thread.join();
+      // Input is detached and System teardown is complete. Do not leave late
+      // callbacks/close events for a future activity in this process.
+      os::EventQueue::instance()->clearEvents();
     }
   }
 };
@@ -195,11 +242,26 @@ void onNativeWindowRedrawNeeded(ANativeActivity* activity, ANativeWindow*)
   static_cast<AndroidApp*>(activity->instance)->redraw(true);
 }
 
-void onNativeWindowDestroyed(ANativeActivity*, ANativeWindow* window)
+void onNativeWindowDestroyed(ANativeActivity* activity, ANativeWindow* window)
 {
+  static_cast<AndroidApp*>(activity->instance)->input.cancel();
   logNativeWindow("destroyed", window);
   os::SystemAndroid::setNativeWindow(nullptr);
   __android_log_write(ANDROID_LOG_INFO, kLogTag, "Native window cleared and reference released");
+}
+
+void onInputQueueCreated(ANativeActivity* activity, AInputQueue* queue)
+{
+  static_cast<AndroidApp*>(activity->instance)->input.attach(queue);
+}
+void onInputQueueDestroyed(ANativeActivity* activity, AInputQueue*)
+{
+  static_cast<AndroidApp*>(activity->instance)->input.detach();
+}
+void onWindowFocusChanged(ANativeActivity* activity, int focused)
+{
+  if (!focused)
+    static_cast<AndroidApp*>(activity->instance)->input.cancel();
 }
 
 __attribute__((constructor)) void onLibraryLoaded()
@@ -227,7 +289,13 @@ extern "C" JNIEXPORT void ANativeActivity_onCreate(ANativeActivity* activity, vo
                       "Platform=Android ABI=arm64-v8a backend=skia GPU=%d SDK=%d",
                       SK_SUPPORT_GPU,
                       activity->sdkVersion);
-  activity->instance = new AndroidApp;
+  // The status bar previously covered the menu targets. Leave navigation and
+  // vendor overlays to Android; no immersive-mode/lifecycle machinery here.
+  ANativeActivity_setWindowFlags(activity, AWINDOW_FLAG_FULLSCREEN, 0);
+  activity->instance = new AndroidApp(activity->env);
+  activity->callbacks->onInputQueueCreated = onInputQueueCreated;
+  activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
+  activity->callbacks->onWindowFocusChanged = onWindowFocusChanged;
   activity->callbacks->onStart = onStart;
   activity->callbacks->onDestroy = onDestroy;
   activity->callbacks->onNativeWindowCreated = onNativeWindowCreated;

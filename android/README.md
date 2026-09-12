@@ -4,8 +4,9 @@ This contains the build infrastructure and minimal LAF platform skeleton from
 [ANDROID_ARM64_AUDIT.md](../ANDROID_ARM64_AUDIT.md). Android now has an internal
 event queue, a CommonSystem base and one logical Skia window. Its raster surface
 is presented through ANativeWindow. The real Aseprite startup and Home UI now
-run on the tablet. Android input translation and filesystem integration remain
-unimplemented.
+run on the tablet. Single-contact touch, basic pen/eraser, mouse and hardware-key
+translation now use the existing LAF event queue. System filesystem integration
+remains unimplemented.
 
 Detailed reports (French):
 [jalon 1](../ANDROID_ARM64_JALON_1_COMPTE_RENDU.md),
@@ -13,7 +14,8 @@ Detailed reports (French):
 [jalon 3](../ANDROID_ARM64_JALON_3_COMPTE_RENDU.md),
 [jalon 4](../ANDROID_ARM64_JALON_4_COMPTE_RENDU.md),
 [jalon 5](../ANDROID_ARM64_JALON_5_COMPTE_RENDU.md),
-[jalon 6](../ANDROID_ARM64_JALON_6_COMPTE_RENDU.md).
+[jalon 6](../ANDROID_ARM64_JALON_6_COMPTE_RENDU.md),
+[jalon 7](../ANDROID_ARM64_JALON_7_COMPTE_RENDU.md).
 Device validation: [XPPen MDP1221](../ANDROID_ARM64_JALON_4_VALIDATION_TABLETTE.md).
 
 The port is on the `android-port` branch of
@@ -172,29 +174,43 @@ instead of XCB; no system clipboard integration was added. Native desktop
 dialog sources and X11 OS sources are excluded only for Android. The common
 Skia system/window sources use the Android skeleton introduced in milestone 2.
 
-## Verified build status — milestone 6, 12 September 2026
+## Verified build status — milestone 7, 12 September 2026
 
 The full native build and debug APK succeed. The APK contains the ARM64 Aseprite
 and C++ runtime libraries, 190 runtime resource files and their extraction index.
 The original build feature flags and single-window policy are preserved.
 
 On the XPPen MDP1221 (Android 14/API 34), installation succeeds and `app_main()`
-loads the theme, fonts, widgets, strings and palettes. A screenshot confirms the
-real menus and Home UI, rendered through the existing Skia raster presenter.
-No document is opened; a drawing canvas/toolbox is therefore not validated.
+loads the theme, fonts, widgets, strings and palettes. Screenshots confirm the
+real Home UI, menus opened through Android input, and the New Sprite dialog.
 
-The Android screen reports the native 2160x1440 bounds. Window scale is explicitly
-limited to 1; `WindowScale` is no longer advertised. This preserves the presenter's
-one-to-one pixel contract. The UI is small and Android system bars overlap it;
-density and insets adaptation are separate work. GPU and MultipleWindows stay off.
+Android defaults to window scale 2 through the existing `screen_scale` preference,
+with a one-time migration from the scale-1 bootstrap. Later user choices are
+preserved. The logical Skia surface is 1080x720; integer nearest-neighbor expansion
+fills the physical 2160x1440 RGBA8888 buffer, respecting both row strides and channel
+order. Theme/UI scale remains 1. GPU and MultipleWindows stay off.
 
-Presentation holds a native-window lifetime mutex through lock/copy/post. Android
-window destruction clears/releases its reference under that same mutex. Callbacks
-queue redraw/resize work on the existing LAF queue; its condition variable wakes
-the UI thread. Synchronous Android redraw waits for completion or application exit.
-At rest the measured CPU tick count did not increase during a 12-second sample.
-Home/return, normal task removal (app_main returns 0, thread joined), and a cold
-relaunch were tested. See the milestone 6 report for logs and screenshots.
+NativeActivity attaches AInputQueue to Android's main looper. Its callbacks enqueue
+LAF pointer/key events and wake the existing GUI queue; they never call widgets.
+Physical input coordinates are divided by the current window scale before UI
+hit testing. One pointer ID is tracked; secondary contacts are ignored. Cancel,
+focus loss and input-queue destruction release pressed state. The LAF stylus type
+is named `Pen`; pressure, tilt, barrel buttons and pen hover are not implemented.
+Keyboard text uses Android's hardware KeyCharacterMap, without IME composition.
+
+The fullscreen window flag uncovers the menu bar. Android navigation and XP-Pen
+controls still overlay parts of the bottom/left edges. There is no density-based
+layout or per-widget adaptation. Automated device injections confirm touch hit
+positions, cancellation, pen/eraser identification, mouse buttons and basic keys;
+physical finger/pen ergonomics still require user validation. Reproducible input
+probes are documented in [tests/README.md](tests/README.md).
+
+Presentation retains the native-window lifetime mutex through lock/copy/post.
+Redraw remains event-driven. Home/return, nested-menu task removal, and Exit/relaunch
+in the same process were tested. Exit now finishes the NativeActivity; a new run
+resets the previous UI closing state before `app_main()`. At idle, CPU ticks did
+not increase over the final 12-second sample. See the milestone 7 report for exact
+evidence and limits.
 
 ### Install and check native startup manually
 
@@ -211,14 +227,14 @@ aseprite_adb=/home/golden/Android/Sdk/platform-tools/adb
 "$aseprite_adb" shell am start -W -n org.aseprite.android/android.app.NativeActivity
 sleep 5
 "$aseprite_adb" shell pidof org.aseprite.android
-"$aseprite_adb" shell dumpsys activity activities > android/build/jalon6-activity.txt
+"$aseprite_adb" shell dumpsys activity activities > android/build/jalon7-activity.txt
 "$aseprite_adb" logcat -d -v threadtime -s Aseprite:I AndroidRuntime:E libc:F \
-  > android/build/jalon6-logcat.txt
-cat android/build/jalon6-logcat.txt
+  > android/build/jalon7-logcat.txt
+cat android/build/jalon7-logcat.txt
 ```
 
 Check the current launch's timestamps in logcat and that the resumed activity
-in `jalon6-activity.txt` belongs to `org.aseprite.android`. A surviving process
+in `jalon7-activity.txt` belongs to `org.aseprite.android`. A surviving process
 alone does not establish that its activity stayed open.
 
 Startup messages (also observed during the tablet validation; SDK was `34`):
@@ -243,11 +259,12 @@ Capture the UI after the launch animation has finished:
 
 ```bash
 sleep 5
-"$aseprite_adb" exec-out screencap -p > android/build/jalon6-screen.png
+"$aseprite_adb" exec-out screencap -p > android/build/jalon7-screen-scaled.png
 ```
 
-The image should show the Aseprite menu bar and Home tab. No Android input is
-implemented yet. Runtime logs can also be read with:
+The image should show the Aseprite menu bar and Home tab at window scale 2.
+A physical tap at `(18, 12)` opens File on the tested tablet. Runtime logs can
+also be read with:
 
 ```bash
 "$aseprite_adb" shell run-as org.aseprite.android cat files/user/Aseprite.log
@@ -264,10 +281,11 @@ After Gradle configuration, the native build directory in this session is
   --target laf-os --parallel 4
 ```
 
-### Run the queue contract test on the host
+### Run the queue and raster contract tests on the host
 
-This standalone project executes the portable Android queue implementation on
-Linux; it does not enable tests in the cross-compiled application.
+This standalone project exercises queue waits/wakeups and integer raster copying
+with RGBA/BGRA, scales 1/2/4 and independent row padding on Linux. It does not enable
+tests in the cross-compiled application.
 
 ```bash
 aseprite_sdk="${ANDROID_HOME:-$HOME/Android/Sdk}"
