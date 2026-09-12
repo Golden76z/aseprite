@@ -98,6 +98,9 @@ add_definitions(-DLIBARCHIVE_STATIC)
 # app-lib target
 
 add_library(app-lib ${generated_files})
+if(ANDROID)
+  target_sources(app-lib PRIVATE android/saf_bridge.cpp)
+endif()
 
 # These specific-platform files should be in an external library
 # (e.g. "base" or "os").

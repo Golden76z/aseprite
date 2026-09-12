@@ -31,6 +31,7 @@ val prepareRuntimeAssets by tasks.registering(Sync::class) {
 }
 
 android {
+    buildFeatures { buildConfig = true }
     sourceSets.getByName("main").assets.directories.add(runtimeAssets.get().asFile.absolutePath)
     namespace = "org.aseprite.android"
     compileSdk = 36

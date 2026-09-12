@@ -1,5 +1,6 @@
 // NativeActivity owns lifecycle; Aseprite owns its UI thread and initialization.
 #include "app/app_menus.h"
+#include "app/android/saf_bridge.h"
 #include "base/fs.h"
 #include "base/platform.h"
 #include "os/android/input.h"
@@ -290,6 +291,7 @@ void onStart(ANativeActivity*)
 }
 void onDestroy(ANativeActivity* activity)
 {
+  app::android::detachSaf(activity);
   os::SystemAndroid::setNativeWindow(nullptr);
   delete static_cast<AndroidApp*>(activity->instance);
   activity->instance = nullptr;
@@ -310,6 +312,7 @@ extern "C" JNIEXPORT void ANativeActivity_onCreate(ANativeActivity* activity, vo
   ANativeActivity_setWindowFlags(activity, AWINDOW_FLAG_FULLSCREEN, 0);
   updateDisplayDensity(activity);
   activity->instance = new AndroidApp(activity->env);
+  app::android::attachSaf(activity);
   activity->callbacks->onConfigurationChanged = onConfigurationChanged;
   activity->callbacks->onInputQueueCreated = onInputQueueCreated;
   activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
