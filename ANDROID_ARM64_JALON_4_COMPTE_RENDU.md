@@ -2,6 +2,11 @@
 
 Date : 12 septembre 2026.
 
+**Validation ultérieure sur tablette : installation, démarrage natif, maintien
+de l’activité et destruction réussis. Voir le [rapport de validation réelle](ANDROID_ARM64_JALON_4_VALIDATION_TABLETTE.md).
+Le document ci-dessous conserve les résultats de la construction initiale,
+effectuée avant la connexion adb.**
+
 Références : [audit](ANDROID_ARM64_AUDIT.md),
 [jalon 1](ANDROID_ARM64_JALON_1_COMPTE_RENDU.md),
 [jalon 2](ANDROID_ARM64_JALON_2_COMPTE_RENDU.md),

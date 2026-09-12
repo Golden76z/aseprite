@@ -10,6 +10,7 @@ Detailed reports (French):
 [jalon 2](../ANDROID_ARM64_JALON_2_COMPTE_RENDU.md),
 [jalon 3](../ANDROID_ARM64_JALON_3_COMPTE_RENDU.md),
 [jalon 4](../ANDROID_ARM64_JALON_4_COMPTE_RENDU.md).
+Device validation: [XPPen MDP1221](../ANDROID_ARM64_JALON_4_VALIDATION_TABLETTE.md).
 
 The port is on the `android-port` branch of
 [Golden76z/aseprite](https://github.com/Golden76z/aseprite/tree/android-port).
@@ -186,8 +187,10 @@ Skia system/window sources use the Android skeleton introduced in milestone 2.
   entry point exported.
 - The packaged manifest declares the exported `android.app.NativeActivity`,
   library name `aseprite`, entry `ANativeActivity_onCreate` and `hasCode=false`.
-- adb found no connected device. Installation, launch, logcat and continued
-  activity lifetime have not been validated on Android.
+- Follow-up validation on an XPPen MDP1221 running Android 14 (API 34) succeeded:
+  APK installation, native library loading, `ANativeActivity_onCreate`, `onStart`,
+  continued foreground activity, `onDestroy`, and a second cold launch.
+  The device report above contains the actual logcat messages.
 
 The logical window stores geometry and requested state only. Its native handle
 and screen are null. The common Skia raster surface has no presentation path.
@@ -202,8 +205,9 @@ and the two build iterations.
 
 ### Install and check native startup manually
 
-No Android device was available during milestone 4. Run these commands from the
-repository root after connecting an authorized ARM64 device (Android API 26+).
+The initial APK build had no connected device; the subsequent tablet validation
+succeeded. To repeat it, run these commands from the repository root after
+connecting an authorized ARM64 device (Android API 26+).
 If multiple devices are listed, add `-s SERIAL` to the adb commands.
 
 ```bash
@@ -224,7 +228,7 @@ Check the current launch's timestamps in logcat and that the resumed activity
 in `jalon4-activity.txt` belongs to `org.aseprite.android`. A surviving process
 alone does not establish that its activity stayed open.
 
-Expected messages from the source code, **not device observations**:
+Startup messages (also observed during the tablet validation; SDK was `34`):
 
 ```text
 Native library loaded: libaseprite.so
