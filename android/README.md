@@ -212,7 +212,10 @@ the existing layout as a whole; no per-widget adaptation is used. Automated devi
 positions, cancellation, pen/eraser identification, mouse buttons and basic keys;
 physical finger/pen drawing was validated in milestone 8. Pressure-sensitive
 dynamics now produce visibly variable brush size with the physical pen in
-milestone 9; the separate alpha-gradient test remains pending. Reproducible input
+milestone 9. The separate fixed-size Gradient / Pressure test also confirms
+varying alpha between transparent background and opaque foreground colors;
+see [the milestone 9 report](../ANDROID_ARM64_JALON_9_COMPTE_RENDU.md).
+Reproducible input
 probes are documented in [tests/README.md](tests/README.md).
 
 Presentation retains the native-window lifetime mutex through lock/copy/post.

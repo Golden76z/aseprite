@@ -4,11 +4,11 @@
 [jalon 8](ANDROID_ARM64_JALON_8_COMPTE_RENDU.md), ainsi que les rapports précédents.
 Base Aseprite `bd54eade9`, LAF `1b478d6`.
 
-**La taille sensible à la pression fonctionne avec le vrai stylet.** Les traces
-et la capture après dessin établissent le transport jusqu’aux dynamiques et la
-variation visible de largeur. L’utilisateur a terminé cette série (« c’est bon »).
-La validation alpha/opacité reste en attente ; ses réglages sont prêts sur la
-XP-Pen MDP1221.
+**La taille et l’opacité répondent à la pression du vrai stylet XP-Pen.** Les traces
+et les captures après dessin établissent le transport jusqu’aux dynamiques
+existantes, la variation de largeur puis la variation alpha à largeur fixe.
+L’utilisateur a terminé chacune des deux séries (« c’est bon »). Aucun moteur de
+brosse ni aucune courbe Android n’ont été ajoutés.
 
 ## Contrat et chemin inspectés avant modification
 
@@ -182,7 +182,7 @@ Preuves conservées :
 - `android/build/jalon9-size-sessions.tar` : archive des sessions de récupération,
   sans prétendre à un enregistrement du document complet.
 
-## Deuxième série préparée — alpha/opacité
+## Deuxième validation physique — alpha/opacité
 
 Nouveau document transparent RGBA 512×512. Crayon rond de **taille fixe 32**,
 Size et Angle désactivés, **Gradient / Pressure**, sens **BG > FG**, **No Dithering**,
@@ -198,7 +198,98 @@ permis le réglage sans changer insets ni échelle.
 - `android/build/jalon9-before-opacity.png` : document vide avant cette série.
 - Marqueur logcat : `JALON9_OPACITY_PHYSICAL_READY`.
 
-**Résultat physique de l’opacité en attente.** Il faut vérifier visuellement la
-transparence, distincte de la largeur, et les champs du diagnostic corrigé.
-Aucune erreur de compilation/runtime ne bloque cette étape ; le prochain travail
-est cette validation manuelle, sans extension tilt/boutons/historique.
+Session réelle du 12 septembre, 23:49:46 à 23:49:57, processus 9254. Quatre traits
+verticaux distincts, device 7, source `0x5002`, TOOL_TYPE_STYLUS → LAF Pen=4.
+L’utilisateur confirme la fin du test ; la capture a été inspectée directement.
+
+| Contact | Maximum Android durant le contact, historique compris | Capture |
+|---|---|---|
+| 10 — premier trait | 0,342001 | Damier nettement visible sous le bleu |
+| 11 — deuxième trait | 0,545443 | Couleur plus couvrante que le premier |
+| 12 — troisième trait | 0,739547 | Couleur beaucoup plus opaque |
+| 13 — quatrième trait progressif | 0,742111 | Départ translucide, puis bleu plus couvrant en descendant |
+
+Les trois premiers traits correspondent à l’ordre demandé léger / normal / ferme,
+sans mesure indépendante de la force appliquée. La quatrième trace confirme une
+montée progressive. Un cinquième trait explicitement décroissant et une série de
+traits rapides ne sont **pas présents dans cette capture/session** : ces sous-cas
+ne sont pas déclarés validés. Aucun tap tactile supplémentaire n’a été reçu dans
+cette série ; le dessin tactile réel est établi par la première série.
+
+- **4 DOWN / 4 UP**, 390 MOVE, 1 221 points historiques, maximum 6 par événement.
+- Domaine contact observé : **0,006531..0,742111**, historique compris.
+- Les quatre DOWN éditeur prennent la capture ; les quatre UP la libèrent.
+- UP non nuls, par exemple **0,022401** et **0,006531**, conservés dans Event :
+  le relâchement ne dépend pas d’une pression nulle.
+- Tous les échantillons outil corrigés indiquent `sizeSensor=0 size=32
+  gradientSensor=1`. La pression pilote effectivement le gradient, pas la taille.
+
+Comparaison représentative sur le même chemin :
+
+| UI | Android = Event = message = Pointer | Dynamique = gradient | Taille |
+|---|---|---|---|
+| 370,110 | 0,123543 | 0,029428 | 32 |
+| 387,475 | 0,501801 | 0,502251 | 32 |
+| 459,110 | 0,232192 | 0,165240 | 32 |
+| 456,143 | 0,512849 | 0,516061 | 32 |
+| 542,398 | 0,501312 | 0,501640 | 32 |
+
+À plus forte pression, l’échantillon outil `Pointer=0,705243` donne
+`dynamics=gradient=0,756554`, toujours avec les seuils utilisateur 0,1/0,9.
+Les trois autres étapes n’échantillonnent pas forcément cette valeur exacte :
+les traces sont bornées indépendamment, elles ne consignent pas chaque MOVE.
+
+La capture `android/build/jalon9-opacity-strokes.png` montre des largeurs
+comparables et une transparence différente, ainsi qu’une progression le long du
+quatrième trait. **Validation visuelle positive de l’alpha via le Gradient
+existant.** Les empreintes circulaires superposées restent perceptibles sur les
+traits les plus translucides ; aucun trou ne les sépare. Leur visibilité seule
+n’établit pas un défaut de livraison Android et ne justifie pas un rejeu de
+l’historique ou une interpolation dans ce jalon. Aucune optimisation ajoutée.
+
+Preuves supplémentaires :
+
+- `android/build/jalon9-opacity-pressure-path.txt` : extrait des traces physiques.
+- `android/build/jalon9-final-activity.txt` : `state=RESUMED delayedResume=false
+  finishing=false`, même processus 9254 après les traits.
+- `android/build/jalon9-idle.txt` : mesure CPU avant puis après la série.
+- `android/build/jalon9-opacity-sessions.tar` : archive des sessions disponibles,
+  sans garantie qu’un document `.aseprite` ait été enregistré.
+
+## Stabilité, limites et suite
+
+Aucun `Fatal signal`, `FATAL EXCEPTION`, message d’abandon ou assertion fatale
+relevé dans le logcat collecté. L’activité reste reprise et le document visible.
+Avant dessin, zéro tick CPU supplémentaire en 5,057 s au repos : aucune boucle
+active constatée. Après dessin, le compteur reste également à 1 556 ticks pendant
+5,057 s, soit zéro tick supplémentaire ; relevé conservé dans `jalon9-idle.txt`.
+Les diagnostics bornés et la présentation événementielle sont conservés.
+
+Le transport Android garde le domaine **0..1 sans calibration**. Les dynamiques
+partagées appliquent leurs seuls seuils existants. Doigt et souris gardent une
+pression Event nulle ; le doigt physique dessine toujours à taille pleine.
+La souris n’a pas fait l’objet d’une nouvelle validation physique dans ce jalon.
+Le cas CANCEL reste couvert par le chemin existant inchangé, sans nouvelle
+interruption physique reproduite. Aucun eraser matériel n’a été observé.
+
+La densité, les coordonnées et le raster sont inchangés : 366 dpi,
+2160×1440 physiques, surface logique 944×629, nearest-neighbor. Les superpositions
+système en bas restent une limite d’accès à certains contrôles. Aucune adaptation
+de densité, de fenêtre ou de widgets n’a été introduite ici.
+
+**Aucun blocage de compilation, de lancement ou de transport de pression restant
+observé.** La taille et l’alpha sont validés physiquement et visuellement ; les
+sous-cas non effectués ci-dessus restent des limites de couverture, pas des bugs
+supposés. Le prochain jalon recommandé est la sauvegarde/réouverture fiable de
+documents sur Android, dans une tâche séparée. Aucune implémentation de fichiers,
+SAF, tilt, boutons, gomme synthétique, gestes ou GPU n’est commencée ici.
+
+## Commits publiés
+
+- LAF `433f819` : transport normalisé et test de contrat.
+- Aseprite `4cb32399f` : raccordement du sous-module, traces et protocole.
+- Aseprite `9d8095792` : validation taille et correction du format du diagnostic.
+- La clôture documentaire de ce rapport fait l’objet d’un commit supplémentaire.
+
+Branches `android-port` des forks GitHub `Golden76z/laf` et `Golden76z/aseprite`.
+Captures, logs et APK restent dans les répertoires de build ignorés par Git.
