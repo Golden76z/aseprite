@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:label="Aseprite" android:hasCode="false">
+        <!-- Build scaffold only: the native entry reports that the backend is unavailable. -->
+        <activity
+            android:name="android.app.NativeActivity"
+            android:exported="true">
+            <meta-data android:name="android.app.lib_name" android:value="aseprite" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

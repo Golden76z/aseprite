@@ -22,6 +22,14 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE_CXX ${CMAKE_CURRENT_SOURCE_DIR}/laf/cmake/cxx
 # Aseprite project
 project(aseprite C CXX)
 
+if(ANDROID)
+  if(NOT CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+    message(FATAL_ERROR "The Android build milestone only supports arm64-v8a")
+  endif()
+  # All static dependencies will eventually be linked into libaseprite.so.
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 # Check repository status
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/laf/CMakeLists.txt" OR
    NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/laf/clip/CMakeLists.txt")
@@ -372,9 +380,13 @@ add_subdirectory(laf)
 if(ENABLE_WEBP)
   # Use libwebp from Skia
   if(LAF_BACKEND STREQUAL "skia")
+    set(WEBP_FIND_OPTIONS)
+    if(ANDROID)
+      set(WEBP_FIND_OPTIONS NO_CMAKE_FIND_ROOT_PATH)
+    endif()
     find_library(WEBP_LIBRARIES webp
       NAMES libwebp # required for Windows
-      PATHS "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH)
+      PATHS "${SKIA_LIBRARY_DIR}" NO_DEFAULT_PATH ${WEBP_FIND_OPTIONS})
     set(WEBP_INCLUDE_DIR "${SKIA_DIR}/third_party/externals/libwebp/src")
     if(WEBP_LIBRARIES)
       set(WEBP_FOUND ON)

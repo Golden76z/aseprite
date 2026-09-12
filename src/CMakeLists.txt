@@ -73,7 +73,21 @@ endif()
 # ENABLE_UPDATER) or for the app.os object (ENABLE_SCRIPTING).
 add_subdirectory(updater)
 
+if(ANDROID AND NOT GEN_EXE)
+  message(FATAL_ERROR "Android requires a Linux host gen executable; build android/host-tools and set GEN_EXE")
+endif()
+
 if(GEN_EXE)
+  if(ANDROID AND (NOT IS_ABSOLUTE "${GEN_EXE}" OR NOT EXISTS "${GEN_EXE}"))
+    message(FATAL_ERROR "GEN_EXE must be the absolute path to an existing Linux host gen executable")
+  endif()
+  if(ANDROID)
+    execute_process(COMMAND "${GEN_EXE}"
+      RESULT_VARIABLE GEN_HOST_RESULT OUTPUT_QUIET ERROR_VARIABLE GEN_HOST_ERROR TIMEOUT 10)
+    if(NOT "${GEN_HOST_RESULT}" STREQUAL "0")
+      message(FATAL_ERROR "GEN_EXE cannot run on the build host: ${GEN_HOST_RESULT} ${GEN_HOST_ERROR}")
+    endif()
+  endif()
   add_executable(gen IMPORTED)
   set_target_properties(gen PROPERTIES IMPORTED_LOCATION ${GEN_EXE})
   set(GEN_DEP)
@@ -195,9 +209,15 @@ if(ENABLE_ASEPRITE_EXE)
     set(INSTALL_OPT BUNDLE)
   endif()
 
-  add_executable(aseprite ${BUNDLE_PARAM}
-    main/main.cpp
-    ${main_resources})
+  if(ANDROID)
+    add_library(aseprite SHARED main/main.cpp main/android_main.cpp)
+    target_link_libraries(aseprite android log)
+    set(INSTALL_OPT LIBRARY)
+  else()
+    add_executable(aseprite ${BUNDLE_PARAM}
+      main/main.cpp
+      ${main_resources})
+  endif()
   if(LAF_BACKEND STREQUAL "skia")
     if(WIN32)
       set_target_properties(aseprite PROPERTIES WIN32_EXECUTABLE true)
