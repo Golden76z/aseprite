@@ -291,10 +291,9 @@ Open, Recent Files and PNG export use ordinary private paths. Runtime assets,
 preferences and documents remain separate. This private workflow does not use
 SAF or request storage permissions.
 
-Enter a name such as `test-jalon10.aseprite` using a hardware keyboard, then
-confirm the selector. Period and minus keys are supported. There is no soft
-keyboard/IME yet. If Android system controls intercept the bottom buttons,
-move the dialog upwards by its title bar or confirm with Enter.
+Enter a name such as `test-jalon10.aseprite` using the Android software keyboard
+or a hardware keyboard, then confirm the selector. Done follows the widget's
+normal Enter behavior; if it focuses OK, tap OK to complete the operation.
 
 Inspect debug app files without changing their location:
 
@@ -333,6 +332,30 @@ partial external file; the private editable document remains available.
 [Milestone 11](../ANDROID_ARM64_JALON_11_COMPTE_RENDU.md) records device validation
 with Downloads and the tablet's Documents provider, including cancellation,
 restart, layers/transparency and byte-for-byte round trips.
+
+### Android software keyboard
+
+Editable Aseprite entries activate a small, non-rendering View/InputConnection
+through LAF `System::setTextInput()`. The widgets remain native Aseprite widgets.
+Gboard text commits use LAF's Unicode-only events, while editing keys retain the
+existing key-message path. Hardware keys keep their existing Android translation.
+
+On the API 34 tablet, the IME inset reduces the visible raster/UI area; density
+and nearest-neighbor scaling stay unchanged. Existing dialogs fit inside that
+area. Back hides the keyboard; tapping the field again reopens it. Leaving the
+field or closing its dialog ends the input session.
+
+LAF currently exposes no surrounding text or selection state. The bridge reports
+these queries as unsupported instead of maintaining a second editable document.
+Composition is buffered until commit/finish, without inline preedit; losing the
+session discards uncommitted composition. Absolute IME selection, reconversion,
+arbitrary replacement ranges and multi-character surrounding deletions are not
+implemented. Numeric fields currently receive the same general keyboard; use
+its digits/symbols layout. Inset handling is implemented for Android API 30+;
+older Android versions have not been validated.
+
+[Milestone 12](../ANDROID_ARM64_JALON_12_COMPTE_RENDU.md) records Save As, numeric
+entry, accented text, hardware regression and lifecycle tests on Gboard.
 
 ### Build just the Android LAF target
 
