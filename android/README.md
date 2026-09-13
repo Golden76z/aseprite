@@ -110,6 +110,12 @@ This produces the signed debug APK at
 `android/app/build/outputs/apk/debug/app-debug.apk`, containing
 `lib/arm64-v8a/libaseprite.so` and `lib/arm64-v8a/libc++_shared.so`.
 
+For the optimized raster build retaining bounded gesture probes, use the
+`rasterProfile` variant and its separate optimized Skia archive. See
+[gesture profiling](tests/GESTURE_PROFILING.md) and the
+[optimized raster comparison](../ANDROID_ARM64_JALON_13_RASTER_OPTIMISE.md).
+Ordinary Release does not enable profiling.
+
 To build only the native library:
 
 ```bash
@@ -206,9 +212,15 @@ retain zero event pressure. Contact ends on UP/CANCEL, never on pressure zero.
 Tilt, barrel buttons and pen hover are not implemented.
 Keyboard text uses Android's hardware KeyCharacterMap, without IME composition.
 
-The fullscreen window flag uncovers the menu bar. Android navigation and XP-Pen
-controls still overlay parts of the bottom/left edges. Density changes resize
-the existing layout as a whole; no per-widget adaptation is used. Automated device injections confirm touch hit
+Milestone 14 replaces the fullscreen flag with an activity-lifetime
+`WindowUiBridge`: API 30+ uses `WindowInsetsController` with transient bars by
+swipe; API 26–29 uses immersive-sticky flags. Visible system bars, cutouts and
+IME define one content rectangle shared by raster presentation and pointer
+mapping. Stable/gesture insets are recorded separately, not permanent padding
+for hidden bars. Transient bars can temporarily overlay edge controls. No
+XP-Pen-specific offsets are applied. Density changes resize the existing layout
+as a whole; no per-widget adaptation is used. See the
+[milestone 14 report](../ANDROID_ARM64_JALON_14_COMPTE_RENDU.md) for validation status. Automated device injections confirm touch hit
 positions, cancellation, pen/eraser identification, mouse buttons and basic keys;
 physical finger/pen drawing was validated in milestone 8. Pressure-sensitive
 dynamics now produce visibly variable brush size with the physical pen in
@@ -351,8 +363,9 @@ Composition is buffered until commit/finish, without inline preedit; losing the
 session discards uncommitted composition. Absolute IME selection, reconversion,
 arbitrary replacement ranges and multi-character surrounding deletions are not
 implemented. Numeric fields currently receive the same general keyboard; use
-its digits/symbols layout. Inset handling is implemented for Android API 30+;
-older Android versions have not been validated.
+its digits/symbols layout. Window/inset policy is now owned by `WindowUiBridge`,
+independently of text-input generations. API 30+ uses typed IME insets; API 26–29
+has a visible-frame fallback, which has not been validated on hardware.
 
 [Milestone 12](../ANDROID_ARM64_JALON_12_COMPTE_RENDU.md) records Save As, numeric
 entry, accented text, hardware regression and lifecycle tests on Gboard.
@@ -415,3 +428,18 @@ aseprite_sdk="${ANDROID_HOME:-$HOME/Android/Sdk}"
 
 See the milestone reports for exact file lists, implementation limits, build
 iterations and commit references. Skia, build outputs and logs remain untracked.
+
+### Android tablet UI size (milestone 15)
+
+Preferences → General → **Tablet UI Size** offers Default (100%), Large
+(112%) and Larger (120%). The choice is stored as `general.android_ui_scale`, applied immediately
+with Apply/OK, and loaded on startup. Existing and fresh installations default
+to 100%; the tablet under validation has explicitly been set to Larger following user feedback.
+
+This multiplies the Android density factor globally, before the existing minimum
+logical size limit. It keeps integer Screen Scaling, theme metrics, nearest
+neighbor raster presentation and all pointer/gesture transforms consistent.
+No Android density setting or per-device offset is changed. See
+[milestone 15](../ANDROID_ARM64_JALON_15_COMPTE_RENDU.md) for results and pending
+physical checks. This Aseprite revision has no tilt dynamics sensor; raw stylus
+tilt/orientation are diagnostic only.

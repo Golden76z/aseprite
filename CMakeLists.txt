@@ -226,6 +226,11 @@ set(LIBRARY_OUTPUT_PATH ${CMAKE_BINARY_DIR}/lib)
 # Common definitions to compile all sources (app code and third party)
 
 # Debug C/C++ flags
+option(ASEPRITE_ANDROID_GESTURE_PROFILE "Keep bounded Android gesture probes in optimized builds" OFF)
+if(ANDROID AND ASEPRITE_ANDROID_GESTURE_PROFILE)
+  add_compile_definitions(ASEPRITE_ANDROID_GESTURE_PROFILE=1)
+endif()
+
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
   add_definitions(-DDEBUGMODE -D_DEBUG)
 else()

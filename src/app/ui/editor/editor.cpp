@@ -9,6 +9,8 @@
   #include "config.h"
 #endif
 
+#include "os/android/gesture_profile.h"
+
 #include "app/ui/editor/editor.h"
 
 #include "app/app.h"
@@ -766,7 +768,10 @@ void Editor::drawOneSpriteUnclippedRect(ui::Graphics* g,
     }
 
     m_renderEngine->setProjection(newEngine ? render::Projection() : m_proj);
-    m_renderEngine->renderSprite(rendered.get(), m_sprite, m_frame, gfx::Clip(0, 0, rc2));
+    {
+      AGP_SPAN("sprite_render");
+      m_renderEngine->renderSprite(rendered.get(), m_sprite, m_frame, gfx::Clip(0, 0, rc2));
+    }
 
     m_renderEngine->removeExtraImage();
 
@@ -2319,6 +2324,11 @@ bool Editor::onProcessMessage(Message* msg)
 
     case kTouchNavigationMessage: {
       const auto& nav = static_cast<TouchNavigationMessage*>(msg)->navigation;
+#if ANDROID_GESTURE_PROFILE
+      const auto profileStart = os::gesture_profile::now();
+      const auto profileZoom = zoom().scale();
+      const auto profileScroll = View::getView(this)->viewScroll();
+#endif
       if (!m_sprite)
         return false;
       if (nav.phase == os::TouchNavigation::Begin) {
@@ -2351,6 +2361,14 @@ bool Editor::onProcessMessage(Message* msg)
         if (nav.position != nav.previous)
           setEditorScroll(View::getView(this)->viewScroll() - (nav.position - nav.previous));
       }
+#if ANDROID_GESTURE_PROFILE
+      const auto profileEndScroll = View::getView(this)->viewScroll();
+      const bool profileZoomChanged = zoom().scale() != profileZoom;
+      os::gesture_profile::record("editor", profileStart, os::gesture_profile::now()-profileStart,
+        nav.profileId, {int(nav.phase), profileZoomChanged,
+        !profileZoomChanged && profileEndScroll != profileScroll,
+        int64_t(zoom().scale()*1000000), profileEndScroll.x, profileEndScroll.y});
+#endif
 #if defined(LAF_ANDROID) && !defined(NDEBUG)
       if (nav.phase != os::TouchNavigation::Update) {
         const auto scroll = View::getView(this)->viewScroll();
@@ -2534,6 +2552,7 @@ void Editor::onResize(ui::ResizeEvent& ev)
 
 void Editor::onPaint(ui::PaintEvent& ev)
 {
+  AGP_SPAN("editor_paint");
   std::unique_ptr<HideBrushPreview> hide;
   if (m_flashing == Flashing::None) {
     // If we are drawing the editor for a tooltip background or any

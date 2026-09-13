@@ -4,9 +4,82 @@
 notamment [jalon 12](ANDROID_ARM64_JALON_12_COMPTE_RENDU.md),
 [jalon 9](ANDROID_ARM64_JALON_9_COMPTE_RENDU.md) et les deux rapports du jalon 7.
 
-**Implémentation compilée, installée et vérifiée par injections sur la XP-Pen.
-Validation avec de vrais doigts et le vrai stylet encore en attente.** Les tests
-injectés ne sont pas présentés comme une validation physique du ressenti.
+## Décision finale — jalon 13 validé fonctionnellement
+
+**Validation acceptée sur la XP-Pen MDP1221 avec la variante raster optimisée.**
+Après « clairement plus fluide », l’utilisateur confirme le pincement court et
+le dessin au vrai stylet avec variation de pression : **« c’est fait et le rendu
+est niquel »**. Ces retours complètent les essais physiques déclarés au début
+et la régression ciblée après correction de performance.
+
+La dernière capture est complète : **5758 records, overflow=0**, **169 Navigation
+traitées sur 169**, **89 frames et 89 présentations** en 3,253 s ; cadence
+**30,15 FPS** entre les posts extrêmes du pincement. Le CPU au repos reste normal
+après ces essais (**0 tick supplémentaire en 10,057 s**), sans crash/ANR ni échec
+de buffer observé sur le PID testé. Le profiler est désarmé après récupération.
+
+Les mesures complètes figurent dans le
+[rapport raster optimisé](ANDROID_ARM64_JALON_13_RASTER_OPTIMISE.md). Les **48,66 FPS
+du pan restent ceux d’un extrait tronqué**, avec deux changements de zoom ; aucun
+benchmark complet de pan pur n’est revendiqué. La validation du vrai stylet et
+de sa pression repose sur la confirmation de l’utilisateur, pas sur un nouveau
+journal numérique de pression. Les verdicts « non établis » ci-dessous décrivent
+les étapes historiques antérieures à cette confirmation finale.
+
+**Suite recommandée : cadrer le zoom progressif demandé par l’utilisateur**, en
+conservant le raster optimisé. La copie/scaling est la prochaine cible CPU si le
+besoin se présente. Aucun GPU/EGL, zoom progressif ou nouveau jalon implémenté
+pendant cette validation.
+
+## Historique des audits et du profilage
+
+**Essais physiques effectués par l’utilisateur sur la XP-Pen MDP1221 ; audit et
+reprise des tests le 13 septembre 2026. Sens du pincement physique et reprise du
+dessin à un doigt confirmés. Quatre tests hôte et six cas injectés réussis ;
+CPU au repos normal lors de la reprise, aucun crash/ANR observé sur le PID de cette reprise.
+Clôture complète encore non établie : les preuves enregistrées ne couvrent pas
+tous les critères.** Ce premier audit n’avait pas identifié de défaut reproductible.
+Les tests injectés restent distincts des essais avec de vrais doigts et le vrai stylet.
+
+**Actualisation — lenteur physique signalée par l’utilisateur :** le pincement
+et le pan à deux doigts sont ressentis comme lents. Le critère de fluidité n’est
+donc pas validé et le jalon reste ouvert. Le
+[rapport de profilage](ANDROID_ARM64_JALON_13_PROFILAGE.md) décrit les sondes
+Debug ajoutées et les 12 captures contrôlées réalisées sur la tablette.
+Sur les pans injectés établis : **93,32 ms/frame en normal**, **93,78 ms en
+immersif**, **363,02 ms en présentation 1:1**. Le plein écran ne procure pas de
+gain matériel dans cette comparaison. La composition GUI raster domine ;
+deux copies/présentations du framebuffer sont aussi effectuées à chaque redraw.
+Ces temps décrivent la phase initiale. Une capture physique récupérée ensuite
+confirme **9,62 FPS sur un geste mixte**, avec deux présentations par redraw.
+Après accord de l’utilisateur, la présentation redondante a été supprimée,
+l’APK Debug reconstruit/installé et les tests repris : **4/4 tests hôte réussis**,
+une présentation par redraw, pan injecté **93,87 → 77,04 ms/frame** sur une
+comparaison fraîche à deux répétitions (environ **13 FPS** après correction).
+Le détail et la capture physique sont dans le rapport lié. Le rendu après
+recréation de surface est vérifié ; le ressenti physique après correction reste
+à confirmer. Aucun zoom progressif ni nouveau jalon n’a été commencé.
+
+**Actualisation — raster optimisé instrumenté :** la variante `rasterProfile`
+(Aseprite/LAF `-O2`, Skia même révision `-O3`, `NDEBUG`, mêmes sondes bornées) est
+construite et installée. Le [rapport comparatif détaillé](ANDROID_ARM64_JALON_13_RASTER_OPTIMISE.md)
+mesure **77,04 → 9,41 ms/frame de pan injecté**, composition UI **50,28 → 2,40 ms**,
+copie/scaling **17,53 → 4,18 ms**, une présentation par redraw. Les 40 updates du
+pan produisent maintenant 40 frames distinctes ; les ~29 FPS sont limités par
+l’injection, pas une mesure du pan physique. Home/UI, ouverture, saisie Gboard,
+save/open privé, lancement SAF et recréation de surface passent. Le pan/pincement
+physiques optimisés et le vrai stylet/pression restent demandés séparément.
+Aucun EGL/GPU n’est justifié par les mesures contrôlées actuelles ; la copie/scaling
+est la prochaine cible CPU mesurée. Le jalon demeure ouvert pour la validation physique.
+
+**Retour physique après optimisation :** l’utilisateur confirme **« clairement
+plus fluide »**. La capture réelle récupérée contient **336 frames à 48,66 FPS**
+sur un extrait de 6,884 s, toujours une présentation par frame. Elle est tronquée
+(`overflow=9298`, End absent) et contient deux changements de zoom : elle n’est
+pas présentée comme un benchmark complet de pan pur. Le
+[rapport optimisé](ANDROID_ARM64_JALON_13_RASTER_OPTIMISE.md) détaille ces limites.
+Le gain ressenti est confirmé ; restent les captures courtes complètes séparées
+et la confirmation du vrai stylet/pression avant clôture physique du jalon.
 
 ## Architecture inspectée
 
@@ -177,16 +250,168 @@ premier MOVE. Aseprite l’a respecté. Elle ne valide pas une interaction physi
 mixte à trois contacts ; aucune tentative de contourner l’annulation Android.
 Le cas Pen + **un** doigt a ensuite reçu une séquence complète sans annulation.
 
-## Essais physiques — en attente
+## Premier audit des essais physiques — preuves disponibles avant reconnexion
 
-La tablette est laissée sur le document de test. Une demande de manipulations a
-été adressée à l’utilisateur : pincer/écarter, déplacer dans plusieurs directions,
-lever un doigt, puis dessiner au doigt et au stylet avec variation de pression.
+L’utilisateur confirme avoir effectué avec de vrais doigts et le vrai stylet
+XP-Pen : pincement entrant/sortant, pan horizontal/vertical/diagonal, ajout du
+deuxième doigt, levée d’un doigt puis des deux, dessin à un doigt après les gestes,
+dessin au stylet et variation de pression après les gestes. Cette déclaration
+établit l’exécution de ces essais ; elle ne précise pas leur verdict individuel
+ni le ressenti. Une clarification sur les résultats observés a été demandée.
 
-À ce stade, **ne sont pas encore revendiqués pour ce jalon** : ressenti du pincement
-physique, pan physique, régression physique stylet/pression, ni absence de traits
-parasites confirmée par l’utilisateur. Les jalons antérieurs restent la référence
-pour la validation physique du dessin et de la pression avant cette modification.
+### Séquences physiques effectivement enregistrées
+
+`android/build/jalon13-logcat.txt`, lignes **515–650**, contient sept séquences
+matérielles, contacts **9 à 15**, de **01:32:45.936 à 01:37:03.768**, toutes sur
+le PID **17642** : `device=4`, `source=0x1002`, `tool=1`, `laf=Touch`.
+Elles se distinguent des sondes précédentes (`device=-1`). Leur attribution
+physique repose aussi sur la confirmation de l’utilisateur, pas sur le nom des
+captures. Aucun contact Pen matériel n’est présent dans ce journal.
+
+| Contact | Distance début → dernière distance, px physiques | Zoom affiché début → fin | Échelle interne début → fin |
+|---|---|---|---|
+| 9 | 442,37 → 271,92 | 100 % → 50 % | 1 → 0,6147 |
+| 10 | 724,05 → 428,88 | 50 % → 33,33 % | 0,6147 → 0,3641 |
+| 11 | 225,63 → 985,23 | 33,33 % → 200 % | 0,3641 → 1,5899 |
+| 12 | 757,89 → 581,45 | 200 % → 100 % | 1,5899 → 1,2197 |
+| 13 | 392,99 → 576,58 | 100 % → 200 % | 1,2197 → 1,7896 |
+| 14 | 681,34 → 982,24 | 200 % → 300 % | 1,7896 → 2,5799 |
+| 15 | 630,73 → 812,76 | 300 % → 300 % | 2,5799 → 3,3245 |
+
+Les distances de fin sont celles du dernier MOVE traité, conservées dans le log
+End. Dans les sept cas, le rapport d’échelle interne correspond, aux arrondis
+du journal près, au rapport des distances. Rapprocher les doigts réduit le zoom ;
+les écarter l’augmente. Le contact 15 reste dans le même palier affiché.
+
+Les sept séquences ont chacune un Begin et un End côté Android et côté éditeur,
+sans Cancel enregistré. Le journal ne conserve que les trois premiers Update
+de chaque geste et les états éditeur Begin/End : il ne permet pas de juger la
+fluidité, les oscillations entre paliers ou toute la trajectoire du pan.
+
+### Verdict par critère demandé
+
+« Non établi » indique une preuve insuffisante, **pas un échec constaté**.
+
+| Critère physique | Verdict de l’audit | Preuve et limite |
+|---|---|---|
+| Sens du pincement correct | **Confirmé** | Sept rapports distance/échelle cohérents, avec réduction et agrandissement effectifs du zoom. |
+| Pincement stable au ressenti | **Non établi** | Pas de vidéo ni de verdict utilisateur explicite ; les Update sont échantillonnés. Les valeurs finales cohérentes ne suffisent pas à certifier le ressenti. |
+| Sens du pan correct | **Partiellement étayé** | Contact 15 : milieu (402,215) → (371,223), scroll (390,295) → (421,287), soit des deltas opposés conformes à la convention. Les trois pans horizontal/vertical/diagonal ne sont pas identifiables séparément dans les traces. |
+| Aucun trait parasite à l’arrivée du deuxième doigt | **Non établi visuellement** | Un seul `Input Touch down` par séquence, puis Begin reçu par l’éditeur ; le code annule DrawingState. Aucune capture ni comparaison du document après ces gestes physiques ne confirme le résultat pixel. Le hash des essais injectés ne couvre pas cette période. |
+| Le doigt restant ne commence pas de nouveau trait | **Confirmé pour les transitions enregistrées** | Aucun nouveau `Input Touch down` ni `EditorPointer down` entre Begin/End et le prochain ACTION_DOWN frais. Pour 12, 13 et 15, ACTION_POINTER_UP puis ACTION_UP apparaissent sans nouvelle pression synthétisée. Une longue trajectoire du doigt restant n’est pas enregistrée. |
+| Dessin à un doigt après gestes | **Non établi** | Les nouveaux DOWN physiques atteignent l’éditeur, mais tous les contacts matériels enregistrés deviennent des gestes ; aucun trait autonome complet après gestes n’est conservé. Essai déclaré effectué par l’utilisateur. |
+| Dessin au stylet après gestes | **Non établi** | Tous les Pen enregistrés ont `device=-1` et précèdent les gestes matériels. Essai physique déclaré effectué par l’utilisateur. |
+| Dynamique de pression après gestes | **Non établie** | Les Pen injectés ont une pression de contact constante [1,1]. Aucun échantillon du vrai stylet après gestes, ni résultat visuel correspondant. Essai physique déclaré effectué par l’utilisateur. |
+| Aucun pointeur/capture bloqué | **Partiellement confirmé** | Sept fins de geste traitées et reprise de nouvelles séquences physiques ; aucun blocage observé dans cet extrait. Pas de diagnostic final de capture ni de dessin de reprise enregistré après le contact 15. |
+| Aucun crash/ANR | **Aucun observé dans la période enregistrée** | Même PID et traitement GUI jusqu’à 01:37:03.768, aucun message fatal/ANR dans le journal. Le tampon crash et le dumpsys sauvegardés précèdent les gestes ; ils ne certifient pas la totalité des essais déclarés. |
+| CPU au repos normal après essais physiques | **Non établi après ces essais** | 0 tick supplémentaire en 10,029 s dans la mesure existante, mais celle-ci date de 01:26, avant le premier geste matériel enregistré à 01:32. |
+
+### Transitions et décision de correction
+
+Le contact 15 illustre `ACTION_DOWN` à **01:36:57.969** → DOWN éditeur à
+**01:36:57.982** → ajout du deuxième doigt / Begin à **01:36:58.029** → Begin
+éditeur à **01:36:58.031** → `ACTION_POINTER_UP` / End à **01:37:03.699** →
+End éditeur et `ACTION_UP` à **01:37:03.768**. Aucun nouveau DOWN intermédiaire.
+Cela concorde avec `SinglePointer → TwoFingerGesture → AwaitFreshDown`.
+Le `captureAfter=1` du DOWN initial est attendu ; il ne constitue pas une preuve
+de capture bloquée après le geste. L’annulation du trait passe par
+`DrawingState::cancelForTouchNavigation()`, sans MouseUp validant le trait.
+
+**Aucun défaut reproductible n’est établi par cet audit.** Aucune correction de
+code, recompilation, réinstallation ou injection supplémentaire effectuée.
+Lors du contrôle, `adb devices -l` ne liste aucun appareil, y compris hors
+sandbox ; impossible de récupérer les événements ultérieurs ou de renouveler
+les mesures CPU/crash. Aucune répétition physique n’est présentée comme exécutée.
+
+## Reprise des tests sur la tablette reconnectée
+
+13 septembre 2026, à partir de 10:17. Appareil ADB **XCD1205AF825A05168**,
+modèle **MDP1221**, PID **30489**. `dumpsys package` indique une dernière mise à
+jour à **01:21:07** : l’APK du jalon 13 est toujours installé. Les limites du
+premier audit ci-dessus décrivent les fichiers alors disponibles ; cette reprise
+apporte les preuves supplémentaires suivantes.
+
+### Tests exécutés et résultats
+
+- **Quatre tests hôte réussis**, 0 échec, 0,13 s : queue d’événements, raster,
+  conversion de densité et pression. Construction Ninja à jour ; journal conservé
+  dans `android/build/jalon13-recheck-host-tests.log`.
+- Le journal récupéré avant les nouvelles injections contient déjà des entrées
+  physiques `device=4`. Après le geste du contact 7, deux traits à un doigt
+  autonomes sont enregistrés, contacts **8 et 9**, de **10:17:18.075 à
+  10:17:20.723** : 65 puis 47 MOVE, UP normal, `captureAfter=0` dans les deux
+  cas. La capture `jalon13-recheck-before.png` montre les traits. **Dessin à un
+  doigt après geste et libération de capture confirmés sur ces séquences.**
+- Un document RGBA transparent 256×256 séparé a été créé et enregistré sous
+  `files/documents/jalon13-recheck-20260913.aseprite`. Le document utilisateur
+  `Sprite-0001` reste ouvert dans son onglet.
+
+Les tests ci-dessous sont des **injections**, effectuées entre **10:21:48 et
+10:22:15**, avec positions et IDs contrôlés. Le zoom est remis à 100 % et le
+document recentré avant chaque cas.
+
+| Test | Résultat mesuré |
+|---|---|
+| Écartement (`gesture-in`, nom technique de la sonde) | 100 % → 200 %, échelle interne 1 → 2,5 ; fichier inchangé. |
+| Rapprochement (`gesture-out`) | 100 % → 33,33 %, échelle interne 1 → 0,3 ; fichier inchangé. |
+| Pan diagonal (+240,+130) physiques | Scroll (289,128) → (185,72), zoom et échelle interne restent à 1 ; fichier inchangé. |
+| Pan puis ACTION_CANCEL | Phase Cancel reçue par l’éditeur, même déplacement ; fichier inchangé. |
+| Ajout du deuxième doigt puis levée du doigt initial | Les sondes attendent 80 ms avant le deuxième contact puis déplacent le doigt restant de 300 px après la levée ; aucun trait persistant. |
+| Trait doigt injecté après gestes | Document modifié ; UP éditeur avec `captureAfter=0` ; Undo restitue le fichier initial. |
+| Trait Pen injecté après gestes | Document modifié ; UP éditeur avec `captureAfter=0` ; Undo restitue le fichier initial. Pression injectée constante, pas une preuve de dynamique physique. |
+
+Après **chaque** geste, Ctrl+S puis lecture par `adb exec-out run-as` donnent
+le SHA-256 initial :
+`19d191e6b2c9d5e6c13c0f5b3e0dd1a7711da17c52926b7c4e8ff69567ea72bc`.
+Le même hash est retrouvé après Undo de chacun des deux traits injectés.
+Les captures du pan et du trait Pen ont été inspectées : canevas déplacé sans
+marque dans le premier cas, trait visible dans le second.
+
+Preuves : `android/build/jalon13-recheck-suite.json`,
+`jalon13-recheck-suite-evidence.txt`, `jalon13-recheck-suite-logcat.txt` et
+captures `jalon13-recheck-gesture-*.png`, `jalon13-recheck-*-stroke.png`.
+L’orchestration locale est conservée dans `android/build/jalon13_recheck.py`.
+
+L’historique Android des sorties de processus précise aussi que l’ancien PID
+**17642** s’est arrêté à **02:14:46.292** pour **USER REQUESTED / FORCE STOP**,
+pas pour crash ou ANR. Le dernier crash natif listé date de **00:53:26.743**,
+PID 14627, avant l’APK final du jalon 13. Source :
+`jalon13-recheck-suite-exit-info.txt`.
+
+### Reprise physique préparée
+
+Après les injections, le document de test a été remis à blanc, à 100 %, et
+**Size / Pressure** activé dans le popup Dynamics, plage **1–12 px**, Angle et
+Gradient désactivés. Capture des réglages : `jalon13-recheck-new-dialog.png`.
+Une collecte de trois minutes avec logcat et captures périodiques
+`jalon13-recheck-live-NN.png` a été démarrée. Les gestes puis les traits physiques
+ont été demandés à l’utilisateur, avec son verdict sur le ressenti, les marques
+parasites et la variation d’épaisseur. Cette fenêtre de collecte n’a reçu
+**aucun nouvel événement Aseprite** ; les captures périodiques montrent le même
+canevas blanc. Aucun nouvel essai physique doigt/stylet n’est donc revendiqué
+pour cette fenêtre. Le document reste prêt pour les manipulations manquantes.
+
+### CPU et stabilité lors de la reprise
+
+PID **30489**, même heure de démarrage avant/après (`starttime=118112215`) :
+**3820 → 3820 ticks CPU en 10,045 s**, soit **0 tick CPU supplémentaire** au
+repos après les gestes physiques de 10:17 et les tests injectés. Aucune entrée
+Aseprite dans la collecte live pendant cette mesure. Le CPU au repos est normal
+sur cet intervalle ; aucun busy-loop constaté.
+
+Le PID reste 30489, l’activité est au premier plan, aucun crash/ANR de cette
+exécution n’est retrouvé dans les diagnostics collectés. Les anciennes entrées
+fatales du tampon système ne sont pas attribuées à cette reprise.
+Sources : `jalon13-recheck-idle.json`, `jalon13-recheck-final-activity.txt`,
+`jalon13-recheck-final-logcat.txt`, `jalon13-recheck-final-crash.txt`,
+`jalon13-recheck-final-exit-info.txt`.
+
+**Verdict actualisé :** CPU au repos, dessin physique à un doigt et libération
+de sa capture désormais confirmés sur cette reprise ; tests injectés tous
+réussis, aucun défaut reproductible constaté. Ressenti du pincement, les trois
+directions de pan physique, absence visuelle de traits parasites physiques,
+dessin au vrai stylet et sa dynamique de pression restent à documenter avec
+les nouvelles manipulations et le retour de l’utilisateur.
 
 ## Captures et traces locales
 
@@ -198,22 +423,33 @@ pour la validation physique du dessin et de la pression avant cette modification
 - `android/build/jalon13-menu-regression.png` : File ouvert après un geste rejeté.
 - `android/build/jalon13-pen-finger-regression.png` : essai Pen + doigt injectés.
 - `android/build/jalon13-physical-before.png` : état laissé pour les essais physiques.
-- `android/build/jalon13-logcat.txt` : collecte complète des essais.
+- `android/build/jalon13-logcat.txt` : injections puis sept gestes physiques ;
+  s’arrête à 01:37:03.768, ne couvre pas tous les essais déclarés.
 - `android/build/jalon13-navigation-evidence.txt` : extraits début/fin, zoom et scroll.
 - `android/build/jalon13-pen-evidence.txt` : séquence Pen + doigt injectée.
 - `android/build/jalon13-idle.json` : CPU au repos.
 - `android/build/jalon13-crash-buffer.txt` : contrôle du tampon crash.
 
-Les captures périodiques `jalon13-physical-NN.png` ne constituent pas à elles seules
-une preuve de gestes physiques : elles doivent être rapprochées des événements
-matériels et de la confirmation de l’utilisateur.
+Audit des captures : `jalon13-physical-before.png` et les **24 captures 00 à 23**
+sont identiques octet pour octet (un seul SHA-256 pour 25 fichiers). La dernière
+date de **01:28**, avant les premiers gestes matériels enregistrés à **01:32**.
+L’image inspectée montre le document à 100 %, les traits colorés et la barre
+système. Elle ne montre pas le résultat des gestes physiques. Les captures
+`final-zoom-out`, `final-after-pan` et `pen-finger-regression` ont également été
+inspectées ; elles documentent les injections antérieures.
+
+`jalon13-activity.txt` (01:29) indique NativeActivity au premier plan, PID 17642,
+avant les gestes matériels. Le dernier événement de `jalon13-crash-buffer.txt`
+date de **00:53:26.720**, dans une session antérieure.
 
 ## Performance et limites
 
 PID 17642 : **1203 → 1203 ticks CPU pendant 10,029 secondes** au repos après les
-essais, sans activité d’entrée. Aucun busy-loop observé. Aucun crash/ANR observé
-sur ce PID durant les tests ; les traces de crash de sessions antérieures ne sont
-pas attribuées à cette exécution.
+essais **injectés**, sans activité d’entrée. Aucun busy-loop observé lors de cette
+mesure de 01:26. Aucun crash/ANR observé dans le journal disponible de ce PID ;
+les traces de crash de sessions antérieures ne sont pas attribuées à cette
+exécution. La reprise décrite ci-dessus fournit une nouvelle mesure après les
+gestes physiques de 10:17 et les injections : 3820 → 3820 ticks en 10,045 s.
 
 - Zoom visuel par paliers Aseprite, avec accumulation continue ; pas de zoom
   arbitraire interpolé. Le point d’ancrage est approximatif et suit les contraintes
@@ -221,11 +457,20 @@ pas attribuées à cette exécution.
 - La barre système Android reste comme aux jalons précédents.
 - Aucun historique tactile rejoué, aucune rotation, aucun geste à trois doigts.
 - Les gestes n’interrompent pas les autres états complexes de transformation.
-- Le ressenti et les régressions physiques restent à confirmer sur cette version.
+- Les essais physiques sont déclarés effectués ; leur verdict complet reste à
+  documenter pour les régressions doigt/stylet/pression ; le ressenti fait désormais
+  l’objet d’un signalement explicite de lenteur, analysé dans le profilage lié.
 
-**Prochain travail : terminer la validation physique du jalon 13**, corriger
-uniquement un défaut reproductible si elle en révèle un. Aucun jalon inclinaison,
-boutons, clipboard, GPU ou extension IME commencé.
+**Décision finale : jalon 13 validé fonctionnellement**, selon la confirmation
+utilisateur et les vérifications finales en tête de rapport. La lenteur signalée
+initialement est résolue au ressenti avec le raster optimisé. Le benchmark complet
+de pan pur reste une limite documentaire ; l’extrait physique ne permet pas de
+certifier sa cadence sur toute la durée.
+
+Le prochain travail recommandé est le cadrage du zoom progressif demandé, sans
+changer d’architecture. Insets/fullscreen, inclinaison, boutons du stylet,
+presse-papiers et composition IME restent des possibilités ultérieures ; aucune
+nouvelle fonctionnalité n’a été commencée ici.
 
 ## Fichiers créés/modifiés
 

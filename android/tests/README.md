@@ -1,5 +1,8 @@
 # Android input probes
 
+For bounded Debug timing captures, real pinch/pan recording, and reversible
+immersive/scale comparisons, see [Gesture profiling](GESTURE_PROFILING.md).
+
 These shell tests inject events through Android InputDispatcher and the app's
 real AInputQueue. They do not replace physical finger/stylus validation. The Java
 probe is a test utility for API 34, not an activity or an APK dependency. It uses
@@ -88,3 +91,41 @@ with the original. A provisional mark must not persist after a gesture. Keep
 physical validation separate: real fingers must verify direction/feel and the
 real pen must still draw with pressure. Android may cancel artificial three-tool
 streams; do not suppress framework ACTION_CANCEL to make a probe pass.
+
+### Fullscreen/insets regression (milestone 14)
+
+Use the optimized `rasterProfile` APK. The host display-metrics and raster
+contracts cover all four insets, offset content, fractional nearest-neighbor
+mapping, clipping and IME close/restore. They do not replace device validation.
+
+On hardware: open a private document, inspect the top menu and bottom timeline,
+reveal bars with an edge swipe and let them hide, open Save As/Gboard, type text,
+hide/refocus the keyboard, return from Home and from the SAF picker. Verify
+physical pen pressure and alignment, single-finger drawing and pinch/pan.
+`AsepriteInsets` logs distinct visible/stable/gesture/tappable/cutout/IME values
+in Debug/profile variants, bounded to 96 state changes per activity.
+
+The short performance regression reuses the milestone 13 trajectory and
+profiler at unchanged density/scale; see
+[results and capture paths](../../ANDROID_ARM64_JALON_14_COMPTE_RENDU.md).
+
+### Bounded stylus discovery (milestone 15)
+
+On Debug or `rasterProfile`, set `debug.aseprite.stylus` to a new token. The first
+Pen/Eraser event starts a 30-second window, capped at 384 `AsepriteStylus` lines.
+MOVE/HOVER_MOVE are sampled at 10 Hz; action/button changes are retained until
+the cap. The token is polled at most once a second during stylus input. Clear
+the property after collection. No output is produced in a normal Release build.
+
+Test near-vertical and tilted directions, hover, light/firm contacts, each real
+barrel button in hover/contact, and a physical eraser if present. Do not label
+injected events as hardware observations. Decode the log with:
+
+```sh
+python3 android/tests/analyze_stylus_sample.py sample.log --token TOKEN --output summary.json
+```
+
+An empty log is rejected. Report observed ranges rather than hardware calibration
+or a button capability inferred from dumpsys. UI scale regression compares
+Default/Large with the same document and gesture trajectory; different logical
+surfaces are intentional in this comparison.

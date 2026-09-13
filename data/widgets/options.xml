@@ -60,6 +60,13 @@
               <listitem text="400%" value="4" />
             </combobox>
 
+            <label id="android_ui_scale_label" text="@.android_ui_scaling" for="android_ui_scale" visible="false" />
+            <combobox id="android_ui_scale" visible="false">
+              <listitem text="@.android_ui_default" value="100" />
+              <listitem text="@.android_ui_large" value="112" />
+              <listitem text="@.android_ui_larger" value="120" />
+            </combobox>
+
             <label text="@.ui_scaling" for="ui_scale" />
             <combobox id="ui_scale">
               <listitem text="100%" value="1" />

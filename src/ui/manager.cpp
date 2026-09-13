@@ -18,6 +18,8 @@
   #include "config.h"
 #endif
 
+#include "os/android/gesture_profile.h"
+
 #include "ui/manager.h"
 
 #include "base/concurrent_queue.h"
@@ -601,12 +603,20 @@ void Manager::generateMessagesFromOSEvents()
 
       case os::Event::TouchNavigation: {
         const auto navigation = osEvent.navigation();
+#if ANDROID_GESTURE_PROFILE
+        os::gesture_profile::record("gui_dequeue", os::gesture_profile::now(), 0, navigation.profileId);
+#endif
         lastMouseMoveEvent = os::Event(); // No drawing cursor update during navigation.
         if (navigation.phase == os::TouchNavigation::Begin)
           m_mouseButton = kButtonNone;
         // Resolve capture/hit-testing after preceding MouseDown messages have
         // actually run. Never invoke widgets on the Android callback thread.
         auto* callback = new CallbackMessage([this, display, navigation] {
+#if ANDROID_GESTURE_PROFILE
+          os::gesture_profile::record("gui_callback", os::gesture_profile::now(), 0, navigation.profileId);
+          if (navigation.phase == os::TouchNavigation::End || navigation.phase == os::TouchNavigation::Cancel)
+            os::gesture_profile::state().finished = true;
+#endif
           TouchNavigationMessage msg(navigation);
           msg.setDisplay(display);
           if (navigation.phase == os::TouchNavigation::Begin) {
@@ -910,6 +920,10 @@ void Manager::updateMouseWidgets(const gfx::Point& mousePos, Display* display)
 
 void Manager::dispatchMessages()
 {
+#if ANDROID_GESTURE_PROFILE
+  ++os::gesture_profile::frameId;
+  os::gesture_profile::Span dispatchSpan("gui_cycle");
+#endif
   // Send messages in the queue (mouse/key/timer/etc. events) This
   // might change the state of widgets, etc. In case pumpQueue()
   // returns a number greater than 0, it means that we've processed
@@ -930,13 +944,23 @@ void Manager::dispatchMessages()
         redrawState = RedrawState::Normal;
 
       // Generate and send just kPaintMessages with the latest UI state.
-      flushRedraw();
-      pumpQueue();
+      {
+        AGP_SPAN("redraw_invalidation");
+        flushRedraw();
+      }
+      {
+        AGP_SPAN("redraw_paint");
+        pumpQueue();
+      }
 
       // Flip back-buffers to real displays.
       flipAllDisplays();
     }
   }
+#if ANDROID_GESTURE_PROFILE
+  dispatchSpan.stop();
+  os::gesture_profile::finishCycle();
+#endif
 }
 
 void Manager::flushMessages() const

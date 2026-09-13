@@ -8,6 +8,8 @@ val skiaDir = providers.gradleProperty("aseprite.skiaDir")
     .orElse(repositoryRoot.resolve(".deps/skia").absolutePath)
 val skiaLibraryDir = providers.gradleProperty("aseprite.skiaLibraryDir")
     .orElse(skiaDir.map { "$it/out/android-arm64" })
+val profileSkiaLibraryDir = providers.gradleProperty("aseprite.profileSkiaLibraryDir")
+    .orElse(skiaDir.map { "$it/out/android-arm64-profile" })
 
 // Ship the same source data used by CMake copy_data, plus its license documents.
 val runtimeAssets = layout.buildDirectory.dir("generated/runtimeAssets")
@@ -75,6 +77,28 @@ android {
             }
         }
     }
+
+    buildTypes {
+        create("rasterProfile") {
+            initWith(getByName("release"))
+            // Allows run-as trace collection. Native assertions remain disabled.
+            isDebuggable = true
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            ndk { debugSymbolLevel = "FULL" }
+            externalNativeBuild {
+                cmake {
+                    arguments += listOf(
+                        "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                        "-DASEPRITE_ANDROID_GESTURE_PROFILE=ON",
+                        "-DSKIA_LIBRARY_DIR=${file(profileSkiaLibraryDir.get()).absolutePath}",
+                    )
+                }
+            }
+        }
+    }
+    // Only Debug and the explicit profiling variant contain the experiment helper.
+    sourceSets.getByName("rasterProfile").java.srcDir("src/debug/java")
 
     externalNativeBuild {
         cmake {

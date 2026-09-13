@@ -1,4 +1,5 @@
 // NativeActivity owns lifecycle; Aseprite owns its UI thread and initialization.
+#include "os/android/gesture_profile.h"
 #include "app/app_menus.h"
 #include "app/android/saf_bridge.h"
 #include "app/ui/file_selector.h"
@@ -8,6 +9,7 @@
 #include "os/android/text_input.h"
 #include "os/android/system.h"
 #include "os/android/window.h"
+#include "os/android/window_ui.h"
 #include "os/event.h"
 #include "os/event_queue.h"
 #include "os/window.h"
@@ -280,6 +282,7 @@ void onConfigurationChanged(ANativeActivity* activity)
 
 void onWindowFocusChanged(ANativeActivity* activity, int focused)
 {
+  if (focused) os::AndroidWindowUi::focus(activity);
   if (!focused)
     static_cast<AndroidApp*>(activity->instance)->input.cancel();
 }
@@ -295,6 +298,7 @@ void onStart(ANativeActivity*)
 void onDestroy(ANativeActivity* activity)
 {
   os::AndroidTextInput::detach(activity);
+  os::AndroidWindowUi::detach(activity);
   app::android::detachSaf(activity);
   os::SystemAndroid::setNativeWindow(nullptr);
   delete static_cast<AndroidApp*>(activity->instance);
@@ -311,13 +315,15 @@ extern "C" JNIEXPORT void ANativeActivity_onCreate(ANativeActivity* activity, vo
                       "Platform=Android ABI=arm64-v8a backend=skia GPU=%d SDK=%d",
                       SK_SUPPORT_GPU,
                       activity->sdkVersion);
-  // The status bar previously covered the menu targets. Leave navigation and
-  // vendor overlays to Android; no immersive-mode/lifecycle machinery here.
-  ANativeActivity_setWindowFlags(activity, AWINDOW_FLAG_FULLSCREEN, 0);
+  // The activity-lifetime Java bridge owns immersive mode and all safe insets.
+#if ANDROID_GESTURE_PROFILE
+  os::gesture_profile::state().directory = activity->internalDataPath;
+#endif
   updateDisplayDensity(activity);
   activity->instance = new AndroidApp(activity->env);
   app::android::attachSaf(activity);
   os::AndroidTextInput::attach(activity);
+  os::AndroidWindowUi::attach(activity);
   activity->callbacks->onConfigurationChanged = onConfigurationChanged;
   activity->callbacks->onInputQueueCreated = onInputQueueCreated;
   activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;

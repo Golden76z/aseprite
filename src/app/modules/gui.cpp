@@ -43,6 +43,9 @@
 #include "os/screen.h"
 #include "os/surface.h"
 #include "os/system.h"
+#if LAF_ANDROID
+  #include "os/android/system.h"
+#endif
 #include "os/window.h"
 #include "ui/intern.h"
 #include "ui/ui.h"
@@ -124,6 +127,7 @@ static bool create_main_window(bool gpuAccel, bool& maximized, std::string& last
   // Scale is equal to 0 when it's the first time the program is
   // executed.
 #if LAF_ANDROID
+  os::SystemAndroid::setUiScalePercent(Preferences::instance().general.androidUiScale());
   // Migrate the scale-1 bootstrap once; later user scale choices are preserved.
   if (!get_config_bool("Android", "TabletScaleInitialized", false)) {
     Preferences::instance().general.screenScale(2);

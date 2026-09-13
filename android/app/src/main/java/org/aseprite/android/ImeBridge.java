@@ -6,7 +6,6 @@ import android.text.InputType;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.WindowInsets;
 import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.ExtractedText;
@@ -23,8 +22,6 @@ public final class ImeBridge extends View {
     private long generation;
     private boolean editing;
     private Connection connection;
-    private int insetBottom = -1;
-    private static native void viewport(long generation, int bottom);
     private final InputMethodManager imm;
     private static native void receive(long generation, String text, int key);
     private static void trace(String s) { if (BuildConfig.DEBUG) Log.i("Aseprite", "IME " + s); }
@@ -36,17 +33,7 @@ public final class ImeBridge extends View {
         setFocusableInTouchMode(true);
         setWillNotDraw(true);
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
-        activity.getWindow().getDecorView().setOnApplyWindowInsetsListener((v, insets) -> {
-            if (android.os.Build.VERSION.SDK_INT >= 30) {
-                int bottom = insets.getInsets(WindowInsets.Type.ime()).bottom;
-                if (bottom != insetBottom) {
-                    insetBottom = bottom;
-                    trace("IME bottom inset=" + bottom);
-                    viewport(generation, bottom);
-                }
-            }
-            return v.onApplyWindowInsets(insets);
-        });
+
     }
 
     public static void update(Activity activity, long generation, boolean editing) {
@@ -103,7 +90,6 @@ public final class ImeBridge extends View {
         return connection;
     }
     @Override protected void onDetachedFromWindow() {
-        ((Activity)getContext()).getWindow().getDecorView().setOnApplyWindowInsetsListener(null);
         editing = false;
         if (connection != null) connection.valid = false;
         imm.hideSoftInputFromWindow(getWindowToken(), 0);

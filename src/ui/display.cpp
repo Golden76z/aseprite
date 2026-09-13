@@ -10,6 +10,8 @@
   #include "config.h"
 #endif
 
+#include "os/android/gesture_profile.h"
+
 #include "ui/display.h"
 
 #include "base/debug.h"
@@ -128,6 +130,9 @@ void Display::flipDisplay()
 
   const os::SurfaceRef windowSurface = nativeSurface();
 
+#if ANDROID_GESTURE_PROFILE
+  os::gesture_profile::Span composeSpan("skia_composite");
+#endif
   // Compose all UI layers in the dirty regions
   for (const UILayerRef& layer : m_layers) {
     const os::SurfaceRef layerSurface = layer->surface();
@@ -157,6 +162,9 @@ void Display::flipDisplay()
   }
 #endif
 
+#if ANDROID_GESTURE_PROFILE
+  composeSpan.stop();
+#endif
   // Invalidate the dirty region in the os::Window only if the window
   // is visible (e.g. if the window is hidden or minimized, we don't
   // need to do this).

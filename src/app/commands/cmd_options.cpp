@@ -45,6 +45,10 @@
 #include "doc/image.h"
 #include "fmt/format.h"
 #include "os/system.h"
+#if LAF_ANDROID
+  #include "os/android/system.h"
+  #include "os/android/window.h"
+#endif
 #include "os/window.h"
 #include "render/render.h"
 #include "ui/ui.h"
@@ -326,6 +330,11 @@ public:
     fillThemeVariants();
     fillThemeFonts();
     updateFontPreviews();
+
+#if LAF_ANDROID
+    androidUiScaleLabel()->setVisible(true);
+    androidUiScale()->setVisible(true);
+#endif
 
     // Language change
     language()->Change.connect([this] { onLanguageChange(); });
@@ -1046,6 +1055,13 @@ public:
     }
 
     bool reset_screen = false;
+#if LAF_ANDROID
+    const int newAndroidUiScale = base::convert_to<int>(androidUiScale()->getValue());
+    if (newAndroidUiScale != m_pref.general.androidUiScale()) {
+      m_pref.general.androidUiScale(newAndroidUiScale);
+      reset_screen = true;
+    }
+#endif
     const int newScreenScale = base::convert_to<int>(screenScale()->getValue());
     if (newScreenScale != m_pref.general.screenScale()) {
       m_pref.general.screenScale(newScreenScale);
@@ -1284,6 +1300,12 @@ private:
 
   void selectScalingItems()
   {
+#if LAF_ANDROID
+    const int selectedScale = m_pref.general.androidUiScale();
+    const int androidScale = (selectedScale == 112 || selectedScale == 120) ? selectedScale : 100;
+    androidUiScale()->setSelectedItemIndex(androidUiScale()->findItemIndexByValue(
+      base::convert_to<std::string>(androidScale)));
+#endif
     // Screen/UI Scale
     screenScale()->setSelectedItemIndex(screenScale()->findItemIndexByValue(
       base::convert_to<std::string>(m_pref.general.screenScale())));
@@ -1294,6 +1316,11 @@ private:
 
   void updateScreenScaling()
   {
+#if LAF_ANDROID
+    os::SystemAndroid::setUiScalePercent(m_pref.general.androidUiScale());
+    if (auto* window = os::WindowAndroid::instance())
+      window->setFrame(os::SystemAndroid::displayBounds());
+#endif
     ui::Manager* manager = ui::Manager::getDefault();
     manager->updateAllDisplays(m_pref.general.screenScale(), m_pref.general.gpuAcceleration());
   }
